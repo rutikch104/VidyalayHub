@@ -29,7 +29,10 @@ export const pp = {
   btnOutlineIcon:
     'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition-all duration-200 hover:bg-muted/50 active:scale-95',
 
-  tabBar: 'premium-profile__tab-bar',
+  tabBar: 'profile-feed-tabs',
+  tabShell: 'profile-feed-tabs__shell',
+  tabList: 'profile-feed-tabs__tabs',
+  tabBarLegacy: 'premium-profile__tab-bar',
   tabScroll: 'premium-profile__tab-scroll',
   tabGrid: 'premium-profile__tab-grid',
   tabTrigger: 'premium-profile__tab-trigger',

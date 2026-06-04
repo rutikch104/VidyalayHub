@@ -331,9 +331,19 @@ async function buildProfilePayload(userRecord, options = {}) {
     created_at: u.created_at,
   };
 
+  const privacy = deepMerge(
+    DEFAULT_PRIVACY,
+    (u.app_settings && typeof u.app_settings === 'object' ? u.app_settings.privacy_settings : null) || {},
+  );
+  body.show_email = !!privacy.show_email;
+  body.show_phone = !!privacy.show_phone;
+
   if (includePrivate) {
     body.email = u.email;
     body.phone = u.phone_number || null;
+  } else {
+    if (privacy.show_email) body.email = u.email;
+    if (privacy.show_phone) body.phone = u.phone_number || null;
   }
 
   if (u.tenant_id) {
@@ -356,9 +366,16 @@ async function buildProfilePayload(userRecord, options = {}) {
   }
 
   try {
-    const [aboutRow, exps, achs, uSkills, teachRow] = await Promise.all([
+    const [aboutRow, exps, edus, achs, uSkills, teachRow] = await Promise.all([
       db.UserAbout.findOne({ where: { user_id: u.id } }),
       db.UserExperience.findAll({
+        where: { user_id: u.id },
+        order: [
+          ['sort_order', 'ASC'],
+          ['created_at', 'ASC'],
+        ],
+      }),
+      db.UserEducation.findAll({
         where: { user_id: u.id },
         order: [
           ['sort_order', 'ASC'],
@@ -393,22 +410,27 @@ async function buildProfilePayload(userRecord, options = {}) {
     }
 
     if (exps && exps.length) {
-      body.experience_list = exps.map((e) => {
-        const x = e.get ? e.get({ plain: true }) : e;
-        return {
-          id: String(x.id),
-          title: x.title,
-          company: x.company || null,
-          duration: x.duration || null,
-          description: x.description || null,
-        };
-      });
+      const experienceService = require('../services/experienceService');
+      body.experience_list = exps
+        .map((e) => experienceService.mapExperienceForApi(e))
+        .sort(experienceService.compareExperienceRows);
       const summary = body.experience_list
         .map((e) => `${e.title}${e.company ? ` @ ${e.company}` : ''}${e.duration ? ` (${e.duration})` : ''}`)
         .join(' · ');
       if (summary) body.experience = summary;
     } else {
       body.experience_list = [];
+    }
+
+    if (edus && edus.length) {
+      const educationService = require('../services/educationService');
+      const eduIds = edus.map((e) => e.id);
+      const skillsMap = await educationService.loadEducationSkills(eduIds);
+      body.education_list = edus
+        .map((e) => educationService.mapEducationForApi(e, skillsMap))
+        .sort(educationService.compareEducationRows);
+    } else {
+      body.education_list = [];
     }
 
     if (achs && achs.length) {
@@ -433,7 +455,7 @@ async function buildProfilePayload(userRecord, options = {}) {
       body.skills = body.skills_detailed.map((s) => s.name);
     }
 
-    if (teachRow) {
+    if (teachRow && u.user_type === 'teacher') {
       const t = teachRow.get ? teachRow.get({ plain: true }) : teachRow;
       body.teaching_info = {
         subjects: Array.isArray(t.subjects) ? t.subjects : [],
@@ -1034,6 +1056,7 @@ exports.getMeSidebarSummary = async (req, res) => {
         connections_count,
         likes_received: likes_received || 0,
         location: user?.location || null,
+        cover_image_url: user?.cover_picture ? resolveMediaUrl(user.cover_picture) : null,
       },
     });
   } catch (e) {

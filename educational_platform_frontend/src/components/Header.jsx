@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Search, Bell, MessageSquare, User, Settings, Menu, X, Sparkles, LogOut,
+  Search, Bell, MessageSquare, User, Settings, Menu, X, LogOut,
   ChevronDown, Loader2, Users, FileText, Building2, Briefcase, Calendar, SearchX,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +46,18 @@ function sortByRelevance(arr, scoreFn) {
   return [...arr].sort((a, b) => scoreFn(a) - scoreFn(b));
 }
 
+/** Present API names that arrive in ALL CAPS as readable title case */
+function formatDisplayLabel(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  const t = text.trim();
+  if (!t) return '';
+  const letters = t.replace(/[^a-zA-Z]/g, '');
+  if (letters.length > 2 && letters === letters.toUpperCase()) {
+    return t.toLowerCase().replace(/\b\w+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+  }
+  return t;
+}
+
 /* ── Search results panel (shared desktop + mobile overlay) ── */
 function SearchResultsPanel({
   query,
@@ -63,22 +75,23 @@ function SearchResultsPanel({
 
   if (query.length < 2) {
     return (
-      <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
-        <Search className="h-5 w-5 text-muted-foreground/30" />
-        <p className="text-xs text-muted-foreground">Type at least 2 characters to search</p>
+      <div className="global-search-panel__empty">
+        <Search className="global-search-panel__empty-icon" aria-hidden />
+        <p className="global-search-panel__empty-title">Start typing to search</p>
+        <p className="global-search-panel__empty-hint">Find people, posts, jobs, communities, and events</p>
       </div>
     );
   }
 
   if (loading && !results) {
     return (
-      <div className="space-y-1 p-2">
+      <div className="global-search-panel__loading">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5">
-            <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-muted" />
-            <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-2/3 animate-pulse rounded-md bg-muted" />
-              <div className="h-2.5 w-1/3 animate-pulse rounded-md bg-muted" />
+          <div key={i} className="global-search-panel__skeleton-row">
+            <div className="global-search-panel__skeleton-avatar" />
+            <div className="global-search-panel__skeleton-lines">
+              <div className="global-search-panel__skeleton-line global-search-panel__skeleton-line--wide" />
+              <div className="global-search-panel__skeleton-line global-search-panel__skeleton-line--narrow" />
             </div>
           </div>
         ))}
@@ -88,10 +101,10 @@ function SearchResultsPanel({
 
   if (empty) {
     return (
-      <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-        <SearchX className="h-8 w-8 text-muted-foreground/30" />
-        <p className="text-sm font-medium text-foreground">No results for "{query}"</p>
-        <p className="text-xs text-muted-foreground">Try different keywords or check your spelling.</p>
+      <div className="global-search-panel__empty">
+        <SearchX className="global-search-panel__empty-icon" aria-hidden />
+        <p className="global-search-panel__empty-title">No results for &ldquo;{query}&rdquo;</p>
+        <p className="global-search-panel__empty-hint">Try different keywords or check your spelling</p>
       </div>
     );
   }
@@ -103,25 +116,26 @@ function SearchResultsPanel({
     const startIdx = flatIdx;
     flatIdx += items.length;
     return (
-      <section className="py-1">
-        <h3 className="mb-0.5 flex items-center gap-1.5 px-3 pt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-          {icon}{label}
+      <section className="global-search-panel__section">
+        <h3 className="global-search-panel__section-label">
+          {icon}
+          <span>{label}</span>
         </h3>
-        <ul>{items.map((item, i) => renderItem(item, startIdx + i))}</ul>
+        <ul className="global-search-panel__list">{items.map((item, i) => renderItem(item, startIdx + i))}</ul>
       </section>
     );
   };
 
   return (
-    <div className="divide-y divide-border/30 p-1.5">
-      {hasError && (
-        <div className="mx-1.5 mb-2 rounded-lg border border-amber-200/60 bg-amber-50/80 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
-          Some categories failed to load.
+    <div className="global-search-panel">
+      {hasError ? (
+        <div className="global-search-panel__notice">
+          Some categories could not be loaded. Showing partial results.
         </div>
-      )}
+      ) : null}
 
       {section(
-        <Users className="h-3 w-3" />,
+        <Users className="h-3.5 w-3.5" aria-hidden />,
         'People',
         results?.users,
         (u, idx) => (
@@ -129,34 +143,34 @@ function SearchResultsPanel({
             <div
               ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
               data-idx={idx}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 transition-colors duration-100 ${
-                focusedIdx === idx ? 'bg-muted' : 'hover:bg-muted/60'
+              className={`global-search-panel__row global-search-panel__row--person ${
+                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
               }`}
             >
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                className="global-search-panel__row-main"
                 onMouseDown={() => onItemMouseDown({ type: 'user', data: u })}
               >
                 <UserAvatar
                   src={headerAvatarSrc(u.avatar_url)}
-                  alt={u.name || 'User'}
+                  alt={formatDisplayLabel(u.name) || 'User'}
                   size="sm"
                   showStatus={false}
                   fallbackSrc={FALLBACK_AVATAR}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-foreground">
-                    <HighlightMatch text={u.name || 'User'} query={debouncedQuery} />
+                <span className="global-search-panel__row-text">
+                  <span className="global-search-panel__row-title">
+                    <HighlightMatch text={formatDisplayLabel(u.name) || 'User'} query={debouncedQuery} />
                   </span>
-                  <span className="block truncate text-xs capitalize text-muted-foreground">
+                  <span className="global-search-panel__row-meta capitalize">
                     {u.user_type || u.role || 'Member'}
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-primary transition-colors hover:bg-primary/10"
+                className="global-search-panel__row-action"
                 onMouseDown={() => onItemMouseDown({ type: 'message', data: u })}
               >
                 Message
@@ -167,7 +181,7 @@ function SearchResultsPanel({
       )}
 
       {section(
-        <FileText className="h-3 w-3" />,
+        <FileText className="h-3.5 w-3.5" aria-hidden />,
         'Posts',
         results?.posts,
         (p, idx) => (
@@ -176,13 +190,15 @@ function SearchResultsPanel({
               type="button"
               ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
               data-idx={idx}
-              className={`flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors duration-100 ${
-                focusedIdx === idx ? 'bg-muted' : 'hover:bg-muted/60'
+              className={`global-search-panel__row global-search-panel__row--stacked ${
+                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
               }`}
               onMouseDown={() => onItemMouseDown({ type: 'post', data: p })}
             >
-              <span className="text-[10px] font-medium text-muted-foreground">{p.user?.name || 'Member'}</span>
-              <span className="line-clamp-2 text-sm text-foreground">
+              <span className="global-search-panel__row-meta">
+                {formatDisplayLabel(p.user?.name) || 'Member'}
+              </span>
+              <span className="global-search-panel__row-snippet">
                 <HighlightMatch text={textSnippet(p.content)} query={debouncedQuery} />
               </span>
             </button>
@@ -191,7 +207,7 @@ function SearchResultsPanel({
       )}
 
       {section(
-        <Building2 className="h-3 w-3" />,
+        <Building2 className="h-3.5 w-3.5" aria-hidden />,
         'Communities',
         results?.communities,
         (c, idx) => (
@@ -200,26 +216,26 @@ function SearchResultsPanel({
               type="button"
               ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
               data-idx={idx}
-              className={`flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors duration-100 ${
-                focusedIdx === idx ? 'bg-muted' : 'hover:bg-muted/60'
+              className={`global-search-panel__row global-search-panel__row--stacked ${
+                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
               }`}
               onMouseDown={() => onItemMouseDown({ type: 'community', data: c })}
             >
-              <span className="text-sm font-semibold text-foreground">
-                <HighlightMatch text={c.name} query={debouncedQuery} />
+              <span className="global-search-panel__row-title">
+                <HighlightMatch text={formatDisplayLabel(c.name)} query={debouncedQuery} />
               </span>
-              {c.description && (
-                <span className="line-clamp-1 text-xs text-muted-foreground">
+              {c.description ? (
+                <span className="global-search-panel__row-snippet">
                   <HighlightMatch text={textSnippet(c.description, 100)} query={debouncedQuery} />
                 </span>
-              )}
+              ) : null}
             </button>
           </li>
         ),
       )}
 
       {section(
-        <Briefcase className="h-3 w-3" />,
+        <Briefcase className="h-3.5 w-3.5" aria-hidden />,
         'Jobs',
         results?.jobs,
         (j, idx) => {
@@ -230,17 +246,17 @@ function SearchResultsPanel({
                 type="button"
                 ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
                 data-idx={idx}
-                className={`flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors duration-100 ${
-                  focusedIdx === idx ? 'bg-muted' : 'hover:bg-muted/60'
+                className={`global-search-panel__row global-search-panel__row--stacked ${
+                  focusedIdx === idx ? 'global-search-panel__row--focused' : ''
                 }`}
                 onMouseDown={() => onItemMouseDown({ type: 'job', data: j })}
               >
-                <span className="text-sm font-semibold text-foreground">
-                  <HighlightMatch text={title} query={debouncedQuery} />
+                <span className="global-search-panel__row-title">
+                  <HighlightMatch text={formatDisplayLabel(title)} query={debouncedQuery} />
                 </span>
-                {j.company_name && (
-                  <span className="text-xs text-muted-foreground">{j.company_name}</span>
-                )}
+                {j.company_name ? (
+                  <span className="global-search-panel__row-meta">{j.company_name}</span>
+                ) : null}
               </button>
             </li>
           );
@@ -248,7 +264,7 @@ function SearchResultsPanel({
       )}
 
       {section(
-        <Calendar className="h-3 w-3" />,
+        <Calendar className="h-3.5 w-3.5" aria-hidden />,
         'Events',
         results?.events,
         (ev, idx) => (
@@ -257,17 +273,17 @@ function SearchResultsPanel({
               type="button"
               ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
               data-idx={idx}
-              className={`flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors duration-100 ${
-                focusedIdx === idx ? 'bg-muted' : 'hover:bg-muted/60'
+              className={`global-search-panel__row global-search-panel__row--stacked ${
+                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
               }`}
               onMouseDown={() => onItemMouseDown({ type: 'event', data: ev })}
             >
-              <span className="text-sm font-semibold text-foreground">
-                <HighlightMatch text={ev.title || 'Event'} query={debouncedQuery} />
+              <span className="global-search-panel__row-title">
+                <HighlightMatch text={formatDisplayLabel(ev.title) || 'Event'} query={debouncedQuery} />
               </span>
-              {ev.start_date && (
-                <span className="text-xs text-muted-foreground">{String(ev.start_date)}</span>
-              )}
+              {ev.start_date ? (
+                <span className="global-search-panel__row-meta">{String(ev.start_date)}</span>
+              ) : null}
             </button>
           </li>
         ),
@@ -502,13 +518,59 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
 
   const showPanel = searchPanelOpen;
 
-  const searchInputBase =
-    'w-full rounded-xl border border-border/50 bg-muted/40 py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-all duration-200 hover:bg-muted/60 focus:bg-card focus:border-primary/50 focus:outline-none focus:ring-[2px] focus:ring-primary/15';
-
-  const iconBtn = (isActive = false) =>
-    `relative rounded-lg p-2 transition-colors duration-150 active:scale-95 ${
-      isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-    }`;
+  const userMenuDropdown = (compact = false) => (
+    showUserMenu ? (
+      <div className="app-header__menu animate-fade-in" role="menu">
+        <div className="app-header__menu-head">
+          <p className="app-header__menu-name">{user?.name}</p>
+          <p className="app-header__menu-email">{user?.email}</p>
+          {user?.user_type ? (
+            <span className="app-header__menu-role">{user.user_type}</span>
+          ) : null}
+        </div>
+        {!compact ? (
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => { onNavigate('profile'); setShowUserMenu(false); }}
+              className="app-header__menu-item"
+              role="menuitem"
+            >
+              <User /> View Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => { onNavigate('settings'); setShowUserMenu(false); }}
+              className="app-header__menu-item"
+              role="menuitem"
+            >
+              <Settings /> Settings
+            </button>
+            <div className="app-header__menu-divider" />
+            <button
+              type="button"
+              onClick={() => { void handleLogout(); }}
+              className="app-header__menu-item app-header__menu-item--danger"
+              role="menuitem"
+            >
+              <LogOut /> Sign Out
+            </button>
+          </div>
+        ) : (
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => { void handleLogout(); }}
+              className="app-header__menu-item app-header__menu-item--danger"
+              role="menuitem"
+            >
+              <LogOut /> Sign Out
+            </button>
+          </div>
+        )}
+      </div>
+    ) : null
+  );
 
   /* Shared results panel (desktop + mobile overlay) */
   const panelContent = (
@@ -528,46 +590,36 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
   /* ── Minimal super-admin header ── */
   if (currentPage === 'super-admin') {
     return (
-      <header className="glass-nav sticky top-0 z-50 border-b border-border/40 supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-xl">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-          <div className="flex h-[4rem] items-center justify-between">
-            <div className="flex items-center gap-3">
-              <InstitutionBranding onNavigate={onNavigate} className="min-w-0" />
-              <span className="hidden rounded-full border border-primary/25 bg-primary/[0.07] px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-primary sm:inline">
-                Super Admin
-              </span>
-            </div>
-            <div className="relative" ref={userMenuRef}>
+      <header className="app-header">
+        <div className="app-header__inner mx-auto max-w-[1440px]">
+          <div className="app-header__start">
+            <InstitutionBranding onNavigate={onNavigate} variant="header" className="min-w-0" />
+            <span className="app-header__super-badge">Super Admin</span>
+          </div>
+          <div className="app-header__end">
+            <div className="app-header__user" ref={userMenuRef}>
               <button
                 type="button"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 aria-expanded={showUserMenu}
                 aria-haspopup="menu"
-                className={`group flex items-center gap-2 rounded-xl border p-1 transition-all duration-200 sm:pr-2.5 ${
-                  showUserMenu
-                    ? 'border-primary/25 bg-primary/[0.06]'
-                    : 'border-transparent hover:border-border/60 hover:bg-muted/80'
-                }`}
+                className={`app-header__user-trigger ${showUserMenu ? 'app-header__user-trigger--open' : ''}`}
               >
-                <UserAvatar src={headerAvatarSrc(user?.avatar_url)} alt={user?.name || 'Admin'} size="sm" status={PRESENCE_STATUS.ONLINE} fallbackSrc={FALLBACK_AVATAR} />
-                <div className="hidden text-left lg:block">
-                  <p className="max-w-[120px] truncate text-xs font-semibold text-foreground">{user?.name || 'Admin'}</p>
+                <UserAvatar
+                  src={headerAvatarSrc(user?.avatar_url)}
+                  alt={user?.name || 'Admin'}
+                  size="sm"
+                  status={PRESENCE_STATUS.ONLINE}
+                  fallbackSrc={FALLBACK_AVATAR}
+                />
+                <div className="app-header__user-text">
+                  <p className="app-header__user-name">{user?.name || 'Admin'}</p>
                 </div>
-                <ChevronDown className={`hidden h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 sm:block ${showUserMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`app-header__user-chevron ${showUserMenu ? 'app-header__user-chevron--open' : ''}`}
+                />
               </button>
-              {showUserMenu && (
-                <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-border/50 bg-card py-1 shadow-modal ring-1 ring-black/[0.04] animate-fade-in" role="menu">
-                  <div className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3.5">
-                    <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-                  </div>
-                  <div className="py-1">
-                    <button type="button" onClick={() => { void handleLogout(); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/5" role="menuitem">
-                      <LogOut className="h-4 w-4" /> Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
+              {userMenuDropdown(true)}
             </div>
           </div>
         </div>
@@ -578,309 +630,232 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
   /* ── Main header ── */
   return (
     <>
-      <header
-        className={`glass-nav sticky top-0 z-50 border-b border-border/40 transition-[box-shadow,border-color] duration-200 supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-xl ${
-          scrolled ? 'shadow-[0_1px_20px_rgba(0,0,0,0.07)]' : ''
-        }`}
-      >
-        <div className="mx-auto max-w-[1440px] px-3 sm:px-5 lg:px-8">
-          <div className="flex h-[4rem] items-center gap-3 sm:gap-4">
-
-            {/* Mobile hamburger */}
+      <header className={`app-header ${scrolled ? 'app-header--scrolled' : ''}`}>
+        <div className="app-header__inner mx-auto max-w-[1440px]">
+          <div className="app-header__start">
             <button
               type="button"
               onClick={onMobileMenuToggle}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+              className="app-header__icon-btn md:hidden"
               aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={isMobileMenuOpen}
             >
-              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {isMobileMenuOpen ? <X /> : <Menu />}
             </button>
+            <InstitutionBranding
+              onNavigate={onNavigate}
+              variant="header"
+              className="min-w-0 max-w-[min(48vw,14rem)] sm:max-w-[min(42vw,18rem)] md:max-w-none"
+            />
+          </div>
 
-            {/* Institution branding */}
-            <InstitutionBranding onNavigate={onNavigate} className="mr-0.5 min-w-0 max-w-[min(42vw,20rem)] sm:max-w-none" />
-
-            {/* ── Desktop search ── */}
-            <div
-              className="relative mx-2 hidden max-w-lg flex-1 lg:block xl:mx-4 xl:max-w-xl"
-              data-search-shell
-            >
-              <label htmlFor="header-search" className="sr-only">Search campus</label>
+          <div className="app-header__center" data-search-shell>
+            <label htmlFor="header-search" className="sr-only">Search campus</label>
+            <div className={`app-header__search ${isSearchFocused || showPanel ? 'focus-within' : ''}`}>
               <Search
-                className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 z-10 transition-colors ${
-                  isSearchFocused || showPanel ? 'text-primary' : 'text-muted-foreground/60'
-                }`}
+                className={`app-header__search-icon ${isSearchFocused || showPanel ? 'app-header__search-icon--active' : ''}`}
+                aria-hidden
               />
               <input
                 ref={desktopInputRef}
                 id="header-search"
                 type="text"
-                placeholder="Search people, posts, jobs…"
+                role="combobox"
+                placeholder="Search people, posts, jobs, events…"
                 autoComplete="off"
+                spellCheck={false}
                 value={globalQuery}
                 onChange={(e) => { setGlobalQuery(e.target.value); setSearchPanelOpen(true); }}
                 onFocus={() => { setIsSearchFocused(true); setSearchPanelOpen(true); }}
                 onBlur={() => setIsSearchFocused(false)}
                 onKeyDown={handleSearchKeyDown}
-                className={`${searchInputBase} ${globalQuery ? 'pr-16' : 'pr-12'}`}
+                className={`app-header__search-input ${globalQuery ? 'app-header__search-input--has-value' : ''}`}
                 aria-haspopup="listbox"
                 aria-expanded={showPanel}
                 aria-autocomplete="list"
               />
-
-              {/* Right accessories */}
-              <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                {globalSearchLoading && (
-                  <Loader2 className="pointer-events-none h-3.5 w-3.5 animate-spin text-primary" />
-                )}
+              <div className="app-header__search-accessories">
+                {globalSearchLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--vh-primary)]" aria-hidden />
+                ) : null}
                 {globalQuery ? (
                   <button
                     type="button"
                     aria-label="Clear search"
                     onClick={clearQuery}
-                    className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                    className="app-header__search-clear"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3 w-3" strokeWidth={2.5} />
                   </button>
                 ) : (
-                  <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/70 sm:inline">
-                    {SHORTCUT_HINT}
-                  </kbd>
+                  <kbd className="app-header__search-kbd">{SHORTCUT_HINT}</kbd>
                 )}
               </div>
-
-              {/* Desktop dropdown */}
-              {showPanel && (
+              {showPanel ? (
                 <div
                   role="listbox"
                   aria-label="Search results"
                   aria-live="polite"
                   data-search-shell
-                  className="absolute left-0 top-full z-[200] mt-1.5 w-full overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_8px_30px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04] animate-in fade-in-0 slide-in-from-top-1 duration-150"
+                  className="app-header__search-panel animate-in fade-in-0 slide-in-from-top-1 duration-150"
                   onMouseDown={(e) => e.preventDefault()}
                 >
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/50 bg-card px-4 py-2.5">
-                    <span className="text-xs text-muted-foreground">
+                  <div className="app-header__search-panel-head">
+                    <span className="app-header__search-panel-status">
                       {globalSearchLoading
-                        ? <span className="flex items-center gap-1.5 font-medium"><Loader2 className="h-3 w-3 animate-spin" />Searching…</span>
+                        ? (
+                          <span className="app-header__search-panel-status--loading">
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                            Searching…
+                          </span>
+                        )
                         : totalGlobalHits > 0
                           ? `${totalGlobalHits} result${totalGlobalHits === 1 ? '' : 's'}`
-                          : null}
+                          : globalQuery.trim().length >= 2
+                            ? 'No matches'
+                            : 'Global search'}
                     </span>
-                    <button
-                      type="button"
-                      aria-label="Close search"
-                      onClick={closeSearch}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <span className="app-header__search-panel-hint" aria-hidden>
+                      Esc
+                    </span>
                   </div>
-                  <div className="max-h-[min(68vh,520px)] overflow-y-auto">{panelContent}</div>
+                  <div className="app-header__search-panel-body">{panelContent}</div>
                 </div>
-              )}
+              ) : null}
             </div>
+          </div>
 
-            {/* Flex spacer (mobile) */}
-            <div className="flex-1 lg:hidden" />
+          <div className="app-header__end">
+            <div className="app-header__spacer" aria-hidden />
 
-            {/* Right controls */}
-            <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+            <button
+              type="button"
+              className="app-header__icon-btn lg:hidden"
+              onClick={() => setMobileSearchOpen(true)}
+              aria-label="Search"
+            >
+              <Search />
+            </button>
 
-              {/* Mobile search trigger */}
-              <button
-                type="button"
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-                onClick={() => setMobileSearchOpen(true)}
-                aria-label="Search"
-              >
-                <Search className="h-5 w-5" />
-              </button>
-
-              {/* Nav shortcuts — visible from lg (1024px) */}
-              <div className="mr-1 hidden items-center gap-0.5 rounded-xl border border-border/50 bg-muted/30 p-0.5 lg:flex">
-                {[
-                  { page: 'library',      label: 'Library' },
-                  { page: 'teacher',      label: 'Teacher' },
-                  { page: 'ai-interview', label: 'AI Interview' },
-                ].map((item) => (
-                  <button
-                    key={item.page}
-                    type="button"
-                    onClick={() => onNavigate(item.page)}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150 ${
-                      currentPage === item.page
-                        ? 'bg-card text-primary shadow-sm ring-1 ring-border/50'
-                        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Notifications — mobile/tablet only (sidebar handles desktop) */}
-              <button
-                type="button"
-                onClick={() => onNavigate('notifications')}
-                className={`${iconBtn(currentPage === 'notifications')} lg:hidden`}
-                aria-label={unreadNotifCount > 0 ? `Notifications, ${unreadNotifCount} unread` : 'Notifications'}
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotifCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground shadow-sm">
-                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Messages — mobile/tablet only */}
-              <button
-                type="button"
-                onClick={() => onNavigate('messages')}
-                className={`${iconBtn(currentPage === 'messages')} lg:hidden`}
-                aria-label={unreadMsgCount > 0 ? `Messages, ${unreadMsgCount} unread` : 'Messages'}
-              >
-                <MessageSquare className="h-5 w-5" />
-                {unreadMsgCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground shadow-sm">
-                    {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
-                  </span>
-                )}
-              </button>
-
-              {/* User menu */}
-              <div className="relative ml-0.5" ref={userMenuRef}>
+            <nav className="app-header__nav" aria-label="Quick navigation">
+              {[
+                { page: 'library', label: 'Library' },
+                { page: 'teacher', label: 'Teacher' },
+                { page: 'ai-interview', label: 'AI Interview' },
+              ].map((item) => (
                 <button
+                  key={item.page}
                   type="button"
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  aria-expanded={showUserMenu}
-                  aria-haspopup="menu"
-                  className={`group flex items-center gap-2 rounded-xl border p-1 transition-all duration-200 sm:pr-2.5 ${
-                    showUserMenu
-                      ? 'border-primary/25 bg-primary/[0.06]'
-                      : 'border-transparent hover:border-border/60 hover:bg-muted/80 active:scale-[0.98]'
-                  }`}
+                  onClick={() => onNavigate(item.page)}
+                  className={`app-header__nav-item ${currentPage === item.page ? 'app-header__nav-item--active' : ''}`}
                 >
-                  <UserAvatar
-                    src={headerAvatarSrc(user?.avatar_url)}
-                    alt={user?.name || 'User'}
-                    size="sm"
-                    status={PRESENCE_STATUS.ONLINE}
-                    fallbackSrc={FALLBACK_AVATAR}
-                    imgClassName="transition-all group-hover:ring-primary/30"
-                  />
-                  <div className="hidden text-left lg:block">
-                    <p className="max-w-[100px] truncate text-xs font-semibold text-foreground">{user?.name || 'User'}</p>
-                  </div>
-                  <ChevronDown className={`hidden h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 sm:block ${showUserMenu ? 'rotate-180' : ''}`} />
+                  {item.label}
                 </button>
+              ))}
+            </nav>
 
-                {showUserMenu && (
-                  <div
-                    className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-border/50 bg-card py-1 shadow-modal ring-1 ring-black/[0.04] animate-fade-in"
-                    role="menu"
-                  >
-                    <div className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3.5">
-                      <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-                      {user?.user_type && (
-                        <span className="mt-1.5 inline-block rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
-                          {user.user_type}
-                        </span>
-                      )}
-                    </div>
-                    <div className="py-1">
-                      <button
-                        type="button"
-                        onClick={() => { onNavigate('profile'); setShowUserMenu(false); }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted/60"
-                        role="menuitem"
-                      >
-                        <User className="h-4 w-4 text-muted-foreground" /> View Profile
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { onNavigate('settings'); setShowUserMenu(false); }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted/60"
-                        role="menuitem"
-                      >
-                        <Settings className="h-4 w-4 text-muted-foreground" /> Settings
-                      </button>
-                      <div className="my-1 border-t border-border/60" />
-                      <button
-                        type="button"
-                        onClick={() => { void handleLogout(); }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
-                        role="menuitem"
-                      >
-                        <LogOut className="h-4 w-4" /> Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('notifications')}
+              className={`app-header__icon-btn lg:hidden ${currentPage === 'notifications' ? 'app-header__icon-btn--active' : ''}`}
+              aria-label={unreadNotifCount > 0 ? `Notifications, ${unreadNotifCount} unread` : 'Notifications'}
+            >
+              <Bell />
+              {unreadNotifCount > 0 ? (
+                <span className="app-header__badge">
+                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('messages')}
+              className={`app-header__icon-btn lg:hidden ${currentPage === 'messages' ? 'app-header__icon-btn--active' : ''}`}
+              aria-label={unreadMsgCount > 0 ? `Messages, ${unreadMsgCount} unread` : 'Messages'}
+            >
+              <MessageSquare />
+              {unreadMsgCount > 0 ? (
+                <span className="app-header__badge">
+                  {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
+                </span>
+              ) : null}
+            </button>
+
+            <div className="app-header__user" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                aria-expanded={showUserMenu}
+                aria-haspopup="menu"
+                className={`app-header__user-trigger ${showUserMenu ? 'app-header__user-trigger--open' : ''}`}
+              >
+                <UserAvatar
+                  src={headerAvatarSrc(user?.avatar_url)}
+                  alt={user?.name || 'User'}
+                  size="sm"
+                  status={PRESENCE_STATUS.ONLINE}
+                  fallbackSrc={FALLBACK_AVATAR}
+                />
+                <div className="app-header__user-text">
+                  <p className="app-header__user-name">{user?.name || 'User'}</p>
+                  {user?.user_type ? (
+                    <p className="app-header__user-role">{user.user_type}</p>
+                  ) : null}
+                </div>
+                <ChevronDown
+                  className={`app-header__user-chevron ${showUserMenu ? 'app-header__user-chevron--open' : ''}`}
+                />
+              </button>
+              {userMenuDropdown(false)}
             </div>
           </div>
         </div>
       </header>
 
-      {/* ── Mobile full-screen search overlay ── */}
-      {mobileSearchOpen && (
-        <div className="fixed inset-0 z-[300] flex flex-col lg:hidden" role="dialog" aria-modal="true" aria-label="Search">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={closeMobileSearch}
-          />
-
-          {/* Panel */}
-          <div className="relative mx-3 mt-3 flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:mx-4">
-            {/* Input row */}
-            <div className="flex shrink-0 items-center gap-2.5 border-b border-border/50 px-3.5 py-3">
+      {mobileSearchOpen ? (
+        <div className="app-header__mobile-search" role="dialog" aria-modal="true" aria-label="Search">
+          <div className="app-header__mobile-search-backdrop" onClick={closeMobileSearch} aria-hidden />
+          <div className="app-header__mobile-search-panel">
+            <div className="app-header__mobile-search-input-row">
               {globalSearchLoading
-                ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-                : <Search className="h-4 w-4 shrink-0 text-muted-foreground/60" />}
+                ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--vh-primary)]" aria-hidden />
+                : <Search className="h-4 w-4 shrink-0 text-[var(--vh-primary)] opacity-70" aria-hidden />}
               <input
                 ref={mobileInputRef}
                 type="text"
                 placeholder="Search people, posts, jobs, events…"
                 autoComplete="off"
+                spellCheck={false}
                 value={globalQuery}
                 onChange={(e) => { setGlobalQuery(e.target.value); }}
                 onKeyDown={handleSearchKeyDown}
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
               {globalQuery ? (
                 <button
                   type="button"
                   aria-label="Clear search"
                   onClick={clearQuery}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
+                  className="app-header__search-clear"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" strokeWidth={2.5} />
                 </button>
               ) : null}
               <button
                 type="button"
                 aria-label="Close search"
                 onClick={closeMobileSearch}
-                className="ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="app-header__mobile-search-done"
               >
-                <X className="h-4 w-4" />
+                Done
               </button>
             </div>
-
-            {/* Results */}
-            <div
-              className="flex-1 overflow-y-auto"
-              onMouseDown={(e) => e.preventDefault()}
-            >
+            <div className="app-header__mobile-search-body" onMouseDown={(e) => e.preventDefault()}>
               {panelContent}
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 };

@@ -420,10 +420,10 @@ const CreatePost = ({ onPostCreated }) => {
           />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground leading-tight truncate">{composerName}</span>
+              <span className="text-[14px] font-bold tracking-tight text-foreground leading-tight truncate">{composerName}</span>
               <PresenceLabel status={PRESENCE_STATUS.ONLINE} />
             </div>
-            <p className="text-[11px] text-muted-foreground/70 leading-tight mt-0.5">Posting to your feed</p>
+            <p className="text-[11.5px] font-medium text-muted-foreground/80 leading-tight mt-1 tracking-tight">Posting to your feed</p>
           </div>
         </div>
 
@@ -436,13 +436,13 @@ const CreatePost = ({ onPostCreated }) => {
               onClick={() => setVisibility(value)}
               title={label}
               className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all duration-150',
+                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-bold tracking-tight transition-all duration-150',
                 visibility === value
-                  ? 'bg-card text-foreground shadow-xs'
+                  ? 'bg-card text-foreground shadow-xs ring-1 ring-border/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <Icon className="h-3 w-3 shrink-0" />
+              <Icon className="h-3 w-3 shrink-0" strokeWidth={2.25} />
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}

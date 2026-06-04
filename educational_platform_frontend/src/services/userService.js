@@ -158,6 +158,27 @@ const userService = {
             throw new Error(body.message || 'Failed to delete experience');
         return body.data;
     },
+    addProfileEducation: async (payload) => {
+        const response = await api.post('/users/profile/education', payload);
+        const body = response.data;
+        if (body?.status === false)
+            throw new Error(body.message || 'Failed to add education');
+        return body.data;
+    },
+    updateProfileEducation: async (id, payload) => {
+        const response = await api.put(`/users/profile/education/${id}`, payload);
+        const body = response.data;
+        if (body?.status === false)
+            throw new Error(body.message || 'Failed to update education');
+        return body.data;
+    },
+    deleteProfileEducation: async (id) => {
+        const response = await api.delete(`/users/profile/education/${id}`);
+        const body = response.data;
+        if (body?.status === false)
+            throw new Error(body.message || 'Failed to delete education');
+        return body.data;
+    },
     addProfileAchievement: async (payload) => {
         const response = await api.post('/users/profile/achievements', payload);
         const body = response.data;

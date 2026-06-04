@@ -61,7 +61,7 @@ export default function SuperAdminAddCollegeModal({ open, onClose, onSuccess, on
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      className="sa-modal-overlay"
       onClick={() => onClose?.()}
       role="presentation"
     >
@@ -69,26 +69,26 @@ export default function SuperAdminAddCollegeModal({ open, onClose, onSuccess, on
         role="dialog"
         aria-modal="true"
         aria-labelledby="super-admin-add-college-title"
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl"
+        className="sa-modal"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <h2 id="super-admin-add-college-title" className="mb-4 text-lg font-bold text-foreground">
+        <h2 id="super-admin-add-college-title" className="sa-modal__title mb-4">
           Add college (tenant)
         </h2>
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-          <div>
-            <label className="text-sm text-muted-foreground">Name *</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Name *</label>
             <input
               required
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={name}
               onChange={(ev) => setName(ev.target.value)}
             />
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Type</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Type</label>
             <select
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__select"
               value={type}
               onChange={(ev) => setType(ev.target.value)}
             >
@@ -97,38 +97,38 @@ export default function SuperAdminAddCollegeModal({ open, onClose, onSuccess, on
               <option value="Arts College">Arts College</option>
             </select>
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Location</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Location</label>
             <input
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={location}
               onChange={(ev) => setLocation(ev.target.value)}
             />
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Website / domain (optional)</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Website / domain (optional)</label>
             <input
               placeholder="example.edu"
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={domain}
               onChange={(ev) => setDomain(ev.target.value)}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="sa-modal__hint">
               Invalid values are ignored; leave blank if unsure.
             </p>
           </div>
-          <div className="flex gap-2 pt-2">
+          <div className="sa-modal__actions">
             <button
               type="button"
               onClick={() => onClose?.()}
-              className="flex-1 rounded-xl border border-border py-2"
+              className="sa-portal__btn"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 rounded-xl bg-primary py-2 font-medium text-primary-foreground disabled:opacity-50"
+              className="sa-portal__btn sa-portal__btn--primary"
             >
               {saving ? 'Saving…' : 'Create'}
             </button>

@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         references: { model: 'Users', key: 'id' },
       },
+      skill_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: { model: 'skills', key: 'id' },
+      },
       skill_name: { type: DataTypes.STRING(200), allowNull: false },
       level: { type: DataTypes.INTEGER, allowNull: true },
       sort_order: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
@@ -27,6 +32,7 @@ module.exports = (sequelize, DataTypes) => {
 
   UserSkill.associate = (models) => {
     UserSkill.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+    UserSkill.belongsTo(models.Skill, { foreignKey: 'skill_id', as: 'skill' });
   };
 
   return UserSkill;

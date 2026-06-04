@@ -46,6 +46,7 @@ const db = require("./database/index")
 const { ensurePostsSchema } = require('./database/ensurePostsSchema');
 const { ensureUserProfileSchema } = require('./database/ensureUserProfileSchema');
 const { ensureUserProfileSectionsSchema } = require('./database/ensureUserProfileSectionsSchema');
+const { ensureSkillsMasterSchema } = require('./database/ensureSkillsMasterSchema');
 const { ensureResourceLibrarySchema } = require('./database/ensureResourceLibrarySchema');
 const { ensureMessagesSchema } = require('./database/ensureMessagesSchema');
 const { ensureGlobalQuestionsSchema } = require('./database/ensureGlobalQuestionsSchema');
@@ -200,6 +201,7 @@ async function runSchemaBootstrap() {
 	await ensurePostsSchema(db.sequelize);
 	await ensureUserProfileSchema(db.sequelize);
 	await ensureUserProfileSectionsSchema(db.sequelize);
+	await ensureSkillsMasterSchema(db.sequelize);
 	await ensureResourceLibrarySchema(db.sequelize);
 	await ensureMessagesSchema(db.sequelize);
 	await ensureGlobalQuestionsSchema(db.sequelize);
@@ -261,7 +263,7 @@ async function bootstrapDatabase() {
 }
 
 bootstrapDatabase().catch((err) => {
-	winston.error('Database bootstrap failed: %s', err.stack || err.message);
+	winston.error(`Database bootstrap failed: ${err?.stack || err?.message || String(err)}`);
 	if (isProduction()) {
 		process.exit(1);
 	}

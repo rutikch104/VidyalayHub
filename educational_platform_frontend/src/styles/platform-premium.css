@@ -97,41 +97,48 @@
   }
 
   .platform-hero__badge {
-    @apply mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] backdrop-blur-md ring-1 ring-white/20;
+    @apply mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[10.5px] font-bold uppercase tracking-[0.16em] text-white/95 backdrop-blur-md ring-1 ring-white/25;
   }
 
   .platform-hero__title {
-    @apply font-display text-[1.625rem] font-bold tracking-tight sm:text-4xl;
+    @apply font-display text-[1.75rem] font-bold tracking-tight leading-[1.1] sm:text-[2.25rem];
     text-shadow: 0 1px 2px hsl(0 0% 0% / 0.18);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
   }
 
   .platform-hero__desc {
-    @apply mt-2.5 max-w-2xl text-sm leading-relaxed text-white/85 sm:text-[15px];
+    @apply mt-2.5 max-w-2xl text-[13.5px] leading-relaxed text-white/90 sm:text-[14.5px];
+    letter-spacing: -0.005em;
   }
 
   .platform-hero__cta {
-    @apply inline-flex shrink-0 items-center gap-2 rounded-2xl bg-white px-5 py-2.5 text-sm font-semibold ring-1 ring-white/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0;
-    box-shadow: 0 8px 24px -8px hsl(0 0% 0% / 0.4);
+    @apply inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13.5px] font-semibold tracking-tight ring-1 ring-white/40;
+    transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 24px -8px hsl(0 0% 0% / 0.35);
+    letter-spacing: -0.01em;
   }
   .platform-hero__cta:hover {
+    transform: translateY(-1px);
     box-shadow: 0 14px 30px -10px hsl(0 0% 0% / 0.45);
+  }
+  .platform-hero__cta:active {
+    transform: translateY(0) scale(0.98);
   }
 
   /* ── Social feed cards (posts, jobs, events) ───────────────────── */
   .social-card {
-    @apply relative overflow-hidden rounded-2xl border border-border/55 bg-card/95 shadow-sm;
+    @apply relative overflow-hidden rounded-2xl border border-border/55 bg-card shadow-soft;
     transition:
-      box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1),
       border-color 0.2s ease,
-      transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .social-card:hover {
     @apply border-border/80;
     box-shadow:
-      0 1px 2px hsl(222 47% 11% / 0.04),
-      0 8px 28px hsl(222 47% 11% / 0.07);
+      0 1px 3px hsl(222 47% 11% / 0.05),
+      0 12px 32px -8px hsl(222 47% 11% / 0.08);
   }
 
   .social-card--interactive {
@@ -171,7 +178,8 @@
 
   /* ── Stat metrics strip ────────────────────────────────────────── */
   .platform-stat {
-    @apply relative overflow-hidden rounded-2xl border border-border/60 bg-card p-4 shadow-xs transition-all duration-200;
+    @apply relative overflow-hidden rounded-2xl border border-border/55 bg-card p-4 shadow-xs;
+    transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .platform-stat::before {
@@ -194,12 +202,12 @@
   .platform-stat:hover::before { opacity: 1; }
 
   .platform-stat__label {
-    @apply text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground;
+    @apply text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/95;
   }
 
   .platform-stat__value {
-    @apply mt-1.5 font-display text-[26px] font-bold leading-none tabular-nums tracking-tight text-foreground;
-    letter-spacing: -0.02em;
+    @apply mt-2 font-display text-[28px] font-bold leading-none tabular-nums tracking-tight text-foreground;
+    letter-spacing: -0.025em;
   }
 
   .platform-stat--violet {
@@ -252,12 +260,18 @@
   }
 
   .platform-search {
-    @apply w-full rounded-xl border border-border/70 bg-muted/30 py-2.5 pl-10 pr-4 text-sm text-foreground shadow-inner transition-all duration-200 placeholder:text-muted-foreground focus:border-primary/60 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/15;
+    @apply w-full rounded-xl border border-border/70 bg-muted/30 py-2.5 pl-10 pr-4 text-[13.5px] text-foreground shadow-inner placeholder:text-muted-foreground/70 tracking-tight focus:border-primary/60 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/15;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    letter-spacing: -0.005em;
   }
+  .platform-search:hover:not(:focus) { @apply border-border bg-muted/40; }
 
   .platform-select {
-    @apply rounded-lg border border-border/70 bg-card px-2.5 py-2 text-sm text-foreground transition-colors focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/10;
+    @apply rounded-xl border border-border/70 bg-card px-3 py-2.5 text-[13.5px] font-medium text-foreground tracking-tight focus:border-primary/55 focus:outline-none focus:ring-2 focus:ring-primary/15;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    letter-spacing: -0.005em;
   }
+  .platform-select:hover:not(:focus) { @apply border-border; }
 
   /* ── Platform tabs (Notifications reference — pill active state) ─ */
   .platform-tabs-shell {
@@ -275,7 +289,9 @@
 
   .platform-tabs__tab,
   .notif-chrome__tab {
-    @apply relative inline-flex shrink-0 snap-center items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition-all duration-200 ease-out hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 focus-visible:ring-offset-1 active:scale-[0.99];
+    @apply relative inline-flex shrink-0 snap-center items-center gap-2 rounded-xl px-4 py-2.5 text-[13.5px] font-semibold text-muted-foreground tracking-tight hover:bg-muted/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-1 active:scale-[0.99];
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    letter-spacing: -0.01em;
   }
 
   .platform-tabs--compact .platform-tabs__tab {
@@ -284,7 +300,8 @@
 
   .platform-tabs__tab--active,
   .notif-chrome__tab--active {
-    @apply bg-white text-slate-900 shadow-sm ring-1 ring-border/60;
+    @apply bg-white text-foreground shadow-sm ring-1 ring-border/60;
+    font-weight: 700;
   }
 
   .platform-tabs__tab-icon,
@@ -308,12 +325,12 @@
 
   .platform-tabs__tab-count,
   .notif-chrome__tab-count {
-    @apply inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground ring-1 ring-border/50;
+    @apply inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-muted/80 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-muted-foreground ring-1 ring-border/50;
   }
 
   .platform-tabs__tab-count--active,
   .notif-chrome__tab-count--active {
-    @apply bg-slate-800 text-white ring-slate-800;
+    @apply bg-primary text-primary-foreground ring-primary/60;
   }
 
   /* Legacy feed-tabs class names → same as platform-tabs (back-compat) */
@@ -548,11 +565,13 @@
   }
 
   .platform-empty__title {
-    @apply relative font-display text-lg font-bold tracking-tight text-foreground;
+    @apply relative font-display text-[17px] font-bold tracking-tight text-foreground;
+    letter-spacing: -0.02em;
   }
 
   .platform-empty__desc {
-    @apply relative mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground;
+    @apply relative mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground;
+    letter-spacing: -0.005em;
   }
 
   /* ── List stagger (feed items) ───────────────────────────────────── */
@@ -2144,11 +2163,12 @@
 
   /* ── Feature card (jobs, events, communities) ────────────────────── */
   .feature-card {
-    @apply relative overflow-hidden rounded-2xl border border-border/55 bg-card shadow-professional transition-all duration-200;
+    @apply relative overflow-hidden rounded-2xl border border-border/55 bg-card shadow-soft;
+    transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .feature-card:hover {
     @apply border-border/80;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 12px 36px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 14px 36px -8px rgba(0,0,0,0.10);
     transform: translateY(-2px);
   }
   .feature-card:active {

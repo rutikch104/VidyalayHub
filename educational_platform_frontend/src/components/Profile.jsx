@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useMemo, useCallback, Component } from 'react';
 import { Camera, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import userService from '@/services/userService';
 import { resolveMediaUrl, formatPostFromApi } from '@/services/postService';
@@ -68,9 +69,11 @@ export default function Profile({ onNavigate }) {
     first_name: '',
     last_name: '',
     headline: '',
-    bio: '',
     location: '',
     phone_number: '',
+    email: '',
+    show_email: false,
+    show_phone: false,
     website_url: '',
     linkedin_url: '',
     github_url: '',
@@ -119,6 +122,7 @@ export default function Profile({ onNavigate }) {
             })()
           : [];
       const experienceList = Array.isArray(response.experience_list) ? response.experience_list : [];
+      const educationList = Array.isArray(response.education_list) ? response.education_list : [];
       const skillsDetailed = Array.isArray(response.skills_detailed) ? response.skills_detailed : [];
       const teachingInfo = response.teaching_info && typeof response.teaching_info === 'object'
         ? response.teaching_info
@@ -133,7 +137,10 @@ export default function Profile({ onNavigate }) {
           response.title ||
           (ut === 'student' ? 'Student' : ut === 'teacher' ? 'Teacher' : ut === 'alumni' ? 'Alumni' : 'User'),
         userType: ut === 'teacher' || ut === 'alumni' ? ut : 'student',
-        phone: response.phone || '',
+        phone: response.phone || response.phone_number || '',
+        email: response.email || user?.email || '',
+        show_email: !!response.show_email,
+        show_phone: !!response.show_phone,
         avatar: avatarSrc,
         coverImage: coverSrc,
         location: response.location || '',
@@ -172,6 +179,7 @@ export default function Profile({ onNavigate }) {
           skillsDetailed,
           certifications: response.certifications || [],
         },
+        educationList,
         achievements: achievementsList,
         clubs: response.clubs || [],
         events: response.events || [],
@@ -195,6 +203,11 @@ export default function Profile({ onNavigate }) {
       }
     } catch (err) {
       console.error('fetchUserProfile:', err);
+      // Keep shape identical to the success-path profile so downstream
+      // section components don't hit undefined arrays / keys when the
+      // API request fails.
+      const safeUt =
+        user.user_type === 'teacher' || user.user_type === 'alumni' ? user.user_type : 'student';
       const fallbackProfile = {
         id: user.id,
         first_name: user.first_name || '',
@@ -202,24 +215,29 @@ export default function Profile({ onNavigate }) {
         name:
           user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
         title:
-          user.user_type === 'student'
-            ? 'Student'
-            : user.user_type === 'teacher'
-              ? 'Teacher'
-              : user.user_type === 'alumni'
-                ? 'Alumni'
-                : 'User',
-        userType: user.user_type || 'student',
+          safeUt === 'teacher' ? 'Teacher' : safeUt === 'alumni' ? 'Alumni' : 'Student',
+        userType: safeUt,
         phone: '',
+        email: user.email || '',
+        show_email: false,
+        show_phone: false,
         avatar: resolveMediaUrl(user.avatar_url || '') || user.avatar_url || DEFAULT_AVATAR,
         coverImage: resolveMediaUrl(user.cover_image_url || '') || user.cover_image_url || '',
         location: '',
+        headline: '',
         bio: '',
+        teachingInfo: { subjects: [], experience_years: null, notes: '' },
         joinedAt: null,
-        stats: { posts: 0, followers: 0, following: 0, likes: 0 },
+        stats: { posts: 0, followers: 0, following: 0, connections: 0, likes: 0 },
         socialLinks: {},
         academicInfo: {},
-        professionalInfo: {},
+        professionalInfo: {
+          experienceList: [],
+          skills: [],
+          skillsDetailed: [],
+          certifications: [],
+        },
+        educationList: [],
         achievements: [],
         clubs: [],
         events: [],
@@ -377,9 +395,11 @@ export default function Profile({ onNavigate }) {
         first_name: profileData.first_name || nm.split(' ')[0] || '',
         last_name: profileData.last_name || nm.split(' ').slice(1).join(' ') || '',
         headline: profileData.headline || '',
-        bio: profileData.bio || '',
         location: profileData.location || '',
         phone_number: profileData.phone || '',
+        email: profileData.email || user?.email || '',
+        show_email: !!profileData.show_email,
+        show_phone: !!profileData.show_phone,
         website_url: profileData.socialLinks?.website || '',
         linkedin_url: profileData.socialLinks?.linkedin || '',
         github_url: profileData.socialLinks?.github || '',
@@ -403,7 +423,6 @@ export default function Profile({ onNavigate }) {
         first_name: editForm.first_name.trim(),
         last_name: editForm.last_name.trim(),
         phone_number: editForm.phone_number.trim() || undefined,
-        bio: editForm.bio.trim() || undefined,
         location: editForm.location.trim() || undefined,
         website_url: editForm.website_url.trim() || undefined,
         linkedin_url: editForm.linkedin_url.trim() || undefined,
@@ -418,9 +437,14 @@ export default function Profile({ onNavigate }) {
       // Headline is stored in UserAbout — persist it via the about endpoint
       await userService.updateProfileAbout({
         headline: editForm.headline.trim(),
-        bio: editForm.bio.trim(),
         location: editForm.location.trim(),
         website: editForm.website_url.trim(),
+      });
+      await userService.updateUserSettings({
+        privacy_settings: {
+          show_email: !!editForm.show_email,
+          show_phone: !!editForm.show_phone,
+        },
       });
       setShowEditModal(false);
       await fetchUserProfile();
@@ -446,7 +470,7 @@ export default function Profile({ onNavigate }) {
       setUploadingAvatar(true);
       const response = await userService.uploadAvatar(file);
       const url = resolveMediaUrl(response.avatar_url) || response.avatar_url;
-      if (profileData) setProfileData({ ...profileData, avatar: url });
+      setProfileData((p) => (p ? { ...p, avatar: url } : p));
       if (updateUser && user) updateUser({ ...user, avatar_url: url });
     } catch (err) {
       setEditError(err.message || 'Failed to upload avatar');
@@ -460,7 +484,7 @@ export default function Profile({ onNavigate }) {
     const file = event.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
-    if (profileData) setProfileData({ ...profileData, coverImage: previewUrl });
+    setProfileData((p) => (p ? { ...p, coverImage: previewUrl } : p));
     try {
       setUploadingCover(true);
       const response = await userService.uploadCover(file);
@@ -468,7 +492,7 @@ export default function Profile({ onNavigate }) {
         ? resolveMediaUrl(response.cover_image_url) || response.cover_image_url
         : '';
       if (!url) throw new Error('Cover upload did not return an image URL');
-      if (profileData) setProfileData({ ...profileData, coverImage: url });
+      setProfileData((p) => (p ? { ...p, coverImage: url } : p));
       if (updateUser && user) updateUser({ ...user, cover_image_url: url });
       setNotice('Cover photo updated.');
       setTimeout(() => setNotice(''), 3200);
@@ -573,11 +597,12 @@ export default function Profile({ onNavigate }) {
         onEditProfile={handleEditProfile}
         onEditAbout={() => setSectionModal('about')}
         onEditExperience={() => setSectionModal('experience')}
+        onEditEducation={() => setSectionModal('education')}
         onEditAchievements={() => setSectionModal('achievements')}
         onEditSkills={() => setSectionModal('skills')}
         onEditProjects={() => setSectionModal('projects')}
         onEditPublications={() => setSectionModal('publications')}
-        onEditTeaching={() => setSectionModal('teaching')}
+        onEditTeaching={userType === 'teacher' ? () => setSectionModal('teaching') : undefined}
         onShareProfile={handleShareProfile}
         onFollow={handleFollowClick}
         onMessage={handleMessageClick}
@@ -687,35 +712,14 @@ export default function Profile({ onNavigate }) {
                       />
                     </div>
                     <div>
-                      <label className="app-label">Bio</label>
-                      <textarea
-                        value={editForm.bio}
-                        onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                        rows={3}
-                        className={`${inputClass} resize-none`}
-                        placeholder="Tell others about yourself…"
+                      <label className="app-label">Location</label>
+                      <input
+                        type="text"
+                        value={editForm.location}
+                        onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                        className={inputClass}
+                        placeholder="City, Country"
                       />
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="app-label">Location</label>
-                        <input
-                          type="text"
-                          value={editForm.location}
-                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                          className={inputClass}
-                          placeholder="City, Country"
-                        />
-                      </div>
-                      <div>
-                        <label className="app-label">Phone</label>
-                        <input
-                          type="tel"
-                          value={editForm.phone_number}
-                          onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
-                          className={inputClass}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -838,6 +842,81 @@ export default function Profile({ onNavigate }) {
                     <span className="font-medium text-foreground">Teaching information</span> section on your profile.
                   </div>
                 )}
+
+                <div>
+                  <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Contact information
+                  </h4>
+                  <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+                    Update your contact details and choose whether they appear on your profile card.
+                    Edit your bio in the About section.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="app-label" htmlFor="profile-edit-phone">
+                        Phone number
+                      </label>
+                      <input
+                        id="profile-edit-phone"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={editForm.phone_number}
+                        onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                        className={inputClass}
+                        placeholder="+91 98765 43210"
+                      />
+                    </div>
+                    <div>
+                      <label className="app-label" htmlFor="profile-edit-email">
+                        Email address
+                      </label>
+                      <input
+                        id="profile-edit-email"
+                        type="email"
+                        value={editForm.email}
+                        readOnly
+                        className={`${inputClass} cursor-default bg-muted/40 text-muted-foreground`}
+                        aria-describedby="profile-edit-email-hint"
+                      />
+                      <p id="profile-edit-email-hint" className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                        Account email is managed through your sign-in credentials.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/25 px-3.5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">Show phone on profile</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Display your phone number on your public profile card
+                        </p>
+                      </div>
+                      <Switch
+                        checked={!!editForm.show_phone}
+                        onCheckedChange={(checked) =>
+                          setEditForm({ ...editForm, show_phone: checked })
+                        }
+                        aria-label="Show phone on profile"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/25 px-3.5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">Show email on profile</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Display your email address on your public profile card
+                        </p>
+                      </div>
+                      <Switch
+                        checked={!!editForm.show_email}
+                        onCheckedChange={(checked) =>
+                          setEditForm({ ...editForm, show_email: checked })
+                        }
+                        aria-label="Show email on profile"
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {editError ? (
                   <div className="app-alert-error rounded-lg px-4 py-3 text-sm">{editError}</div>

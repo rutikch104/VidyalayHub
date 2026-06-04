@@ -68,7 +68,40 @@ let mockProfileMutable = {
     ...MOCK_PROFILE_DETAIL,
     headline: 'Final-year CSE · Full-stack & cloud',
     experience_list: [
-        { id: 'ex-m1', title: 'Summer Intern', company: 'Campus Labs', duration: 'May – Jul 2025', description: 'Built internal dashboards with React and Node.' },
+        {
+            id: 'ex-m1',
+            title: 'Summer Intern',
+            company: 'Campus Labs',
+            start_month: 5,
+            start_year: 2025,
+            end_month: 7,
+            end_year: 2025,
+            is_current_role: false,
+            duration: 'May 2025 – Jul 2025',
+            description: 'Built internal dashboards with React and Node.',
+        },
+    ],
+    education_list: [
+        {
+            id: 'edu-m1',
+            institution_name: 'RCPIT Shirpur',
+            school: 'RCPIT Shirpur',
+            degree: 'B.Tech',
+            field_of_study: 'Computer Science',
+            start_month: 8,
+            start_year: 2023,
+            end_month: null,
+            end_year: null,
+            is_current_studying: true,
+            duration: 'Aug 2023 – Present',
+            cgpa: '9.2',
+            percentage: null,
+            grade_line: 'CGPA: 9.2',
+            description: 'IEEE Student Branch · Coding Club',
+            achievements: null,
+            skills: [{ id: 'es1', name: 'React' }, { id: 'es2', name: 'Node.js' }],
+            skill_names: ['React', 'Node.js'],
+        },
     ],
     skills_detailed: [
         { id: 'sk-m1', name: 'React', level: 8 },
@@ -76,6 +109,90 @@ let mockProfileMutable = {
     ],
     teaching_info: { subjects: ['Data Structures', 'Web Programming'], experience_years: 4, notes: 'Office hours: Tue 4–6pm' },
 };
+/** Master skills catalog for GET /users/skills/suggest (mock mode). */
+const MOCK_SKILL_CATALOG = [
+    { id: 'ms-1', skill_name: 'React' },
+    { id: 'ms-2', skill_name: 'ReactJS' },
+    { id: 'ms-3', skill_name: 'Node.js' },
+    { id: 'ms-4', skill_name: 'PostgreSQL' },
+    { id: 'ms-5', skill_name: 'TypeScript' },
+    { id: 'ms-6', skill_name: 'Python' },
+    { id: 'ms-7', skill_name: 'AWS' },
+    { id: 'ms-8', skill_name: 'Docker' },
+    { id: 'ms-9', skill_name: 'JavaScript' },
+    { id: 'ms-10', skill_name: 'LangChain' },
+    { id: 'ms-11', skill_name: 'MongoDB' },
+    { id: 'ms-12', skill_name: 'GraphQL' },
+    { id: 'ms-13', skill_name: 'Kubernetes' },
+    { id: 'ms-14', skill_name: 'TensorFlow' },
+    { id: 'ms-15', skill_name: 'Machine Learning' },
+];
+
+function mockNormalizeSkillName(value) {
+    return String(value || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+}
+
+const MOCK_MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function mockFormatExperienceDuration(row = {}) {
+    const sm = row.start_month != null ? Number(row.start_month) : null;
+    const sy = row.start_year != null ? Number(row.start_year) : null;
+    const em = row.end_month != null ? Number(row.end_month) : null;
+    const ey = row.end_year != null ? Number(row.end_year) : null;
+    if (sm && sy) {
+        const start = `${MOCK_MONTH_SHORT[sm - 1] || ''} ${sy}`.trim();
+        if (row.is_current_role) return `${start} – Present`;
+        if (em && ey) return `${start} – ${MOCK_MONTH_SHORT[em - 1] || ''} ${ey}`.trim();
+        return start;
+    }
+    return row.duration || null;
+}
+
+function mockBuildExperienceRow(body, id) {
+    const title = String(body?.title || '').trim();
+    if (!title) return { error: 'title is required.' };
+    const start_month = parseInt(String(body?.start_month), 10);
+    const start_year = parseInt(String(body?.start_year), 10);
+    const is_current_role = !!body?.is_current_role;
+    if (!start_month || start_month < 1 || start_month > 12) {
+        return { error: 'Start month is required.' };
+    }
+    if (!start_year || Number.isNaN(start_year)) {
+        return { error: 'Start year is required.' };
+    }
+    let end_month = null;
+    let end_year = null;
+    if (!is_current_role) {
+        end_month = parseInt(String(body?.end_month), 10);
+        end_year = parseInt(String(body?.end_year), 10);
+        if (!end_month || end_month < 1 || end_month > 12) {
+            return { error: 'End month is required.' };
+        }
+        if (!end_year || Number.isNaN(end_year)) {
+            return { error: 'End year is required.' };
+        }
+        if (end_year * 12 + end_month < start_year * 12 + start_month) {
+            return { error: 'End date cannot be earlier than start date.' };
+        }
+    }
+    const row = {
+        id: id || `ex-${Date.now()}`,
+        title,
+        company: body?.company ? String(body.company).trim() : null,
+        description: body?.description ? String(body.description).trim() : null,
+        start_month,
+        start_year,
+        end_month,
+        end_year,
+        is_current_role,
+    };
+    row.duration = mockFormatExperienceDuration(row);
+    return { row };
+}
+
 let mockProjectsStore = [
     {
         id: '1',
@@ -744,7 +861,17 @@ function matchRoute(method, url, body = {}) {
         return { status: true, data: mockResources[0] };
     // Users
     if (u.includes('/users/me/sidebar-summary'))
-        return { status: true, data: { posts_count: 28, connections_count: 45, likes_received: 312, location: 'Shirpur, Maharashtra' } };
+        return {
+            status: true,
+            data: {
+                posts_count: 28,
+                connections_count: 45,
+                likes_received: 312,
+                location: 'Shirpur, Maharashtra',
+                cover_image_url:
+                    'https://images.pexels.com/photos/2422585/pexels-photo-2422585.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            },
+        };
     if (u.includes('/users/profile/avatar') && method === 'POST')
         return { status: true, data: { avatar_url: AVATAR2 } };
     if (u.includes('/users/profile/cover') && method === 'POST')
@@ -765,21 +892,82 @@ function matchRoute(method, url, body = {}) {
         };
         return { status: true, data: { ...mockProfileMutable } };
     }
-    if (pathNoTrailing.endsWith('/users/profile/experience') && method === 'POST') {
+    if (pathNoTrailing.endsWith('/users/profile/education') && method === 'POST') {
+        const inst = String(body?.institution_name || body?.school || '').trim();
+        if (!inst) return { status: false, message: 'Institution name is required.' };
+        const start_month = parseInt(String(body?.start_month), 10);
+        const start_year = parseInt(String(body?.start_year), 10);
+        if (!start_month || !start_year) return { status: false, message: 'Start date is required.' };
+        const is_current = !!body?.is_current_studying;
+        let end_month = null;
+        let end_year = null;
+        if (!is_current) {
+            end_month = parseInt(String(body?.end_month), 10);
+            end_year = parseInt(String(body?.end_year), 10);
+            if (!end_month || !end_year) return { status: false, message: 'End date is required.' };
+        }
         const row = {
-            id: `ex-${Date.now()}`,
-            title: body?.title || 'Role',
-            company: body?.company || null,
-            duration: body?.duration || null,
+            id: `edu-${Date.now()}`,
+            institution_name: inst,
+            school: inst,
+            degree: body?.degree || null,
+            field_of_study: body?.field_of_study || null,
+            start_month,
+            start_year,
+            end_month,
+            end_year,
+            is_current_studying: is_current,
+            cgpa: body?.cgpa || null,
+            percentage: body?.percentage || null,
             description: body?.description || null,
+            achievements: body?.achievements || null,
+            skills: Array.isArray(body?.skills) ? body.skills : [],
+            skill_names: (body?.skills || []).map((s) => (typeof s === 'string' ? s : s.skill_name || s.name)).filter(Boolean),
         };
-        mockProfileMutable.experience_list = [...(mockProfileMutable.experience_list || []), row];
+        const sm = MOCK_MONTH_SHORT[start_month - 1];
+        row.duration = is_current
+            ? `${sm} ${start_year} – Present`
+            : `${sm} ${start_year} – ${MOCK_MONTH_SHORT[end_month - 1]} ${end_year}`;
+        const gradeParts = [];
+        if (row.cgpa) gradeParts.push(`CGPA: ${row.cgpa}`);
+        if (row.percentage) gradeParts.push(`Grade: ${row.percentage}`);
+        row.grade_line = gradeParts.join(' · ') || null;
+        mockProfileMutable.education_list = [...(mockProfileMutable.education_list || []), row];
         return { status: true, message: 'ok', item: row, data: { ...mockProfileMutable } };
+    }
+    if (u.match(/\/users\/profile\/education\/[^/]+$/) && method === 'PUT') {
+        const id = u.split('/').pop();
+        const list = mockProfileMutable.education_list || [];
+        const i = list.findIndex((e) => e.id === id);
+        if (i === -1) return { status: false, message: 'Education not found.' };
+        const prev = list[i];
+        const inst = String(body?.institution_name ?? prev.institution_name).trim();
+        if (!inst) return { status: false, message: 'Institution name is required.' };
+        const row = { ...prev, ...body, id, institution_name: inst, school: inst };
+        if (row.skills) {
+            row.skill_names = row.skills.map((s) => (typeof s === 'string' ? s : s.skill_name || s.name)).filter(Boolean);
+        }
+        list[i] = row;
+        mockProfileMutable.education_list = list;
+        return { status: true, data: { ...mockProfileMutable } };
+    }
+    if (u.match(/\/users\/profile\/education\/[^/]+$/) && method === 'DELETE') {
+        const id = u.split('/').pop();
+        mockProfileMutable.education_list = (mockProfileMutable.education_list || []).filter((e) => e.id !== id);
+        return { status: true, data: { ...mockProfileMutable } };
+    }
+    if (pathNoTrailing.endsWith('/users/profile/experience') && method === 'POST') {
+        const built = mockBuildExperienceRow(body);
+        if (built.error) return { status: false, message: built.error };
+        mockProfileMutable.experience_list = [...(mockProfileMutable.experience_list || []), built.row];
+        return { status: true, message: 'ok', item: built.row, data: { ...mockProfileMutable } };
     }
     if (u.match(/\/users\/profile\/experience\/[^/]+$/) && method === 'PUT') {
         const id = u.split('/').pop();
+        const built = mockBuildExperienceRow(body, id);
+        if (built.error) return { status: false, message: built.error };
         mockProfileMutable.experience_list = (mockProfileMutable.experience_list || []).map((e) =>
-            e.id === id ? { ...e, ...body, id } : e,
+            e.id === id ? built.row : e,
         );
         return { status: true, data: { ...mockProfileMutable } };
     }
@@ -806,7 +994,56 @@ function matchRoute(method, url, body = {}) {
         mockProfileMutable.achievements = (mockProfileMutable.achievements || []).filter((a) => (typeof a === 'object' ? a.id !== id : true));
         return { status: true, data: { ...mockProfileMutable } };
     }
+    if (pathNoTrailing.endsWith('/users/skills/suggest') && method === 'GET') {
+        const queryStr = url.includes('?') ? url.split('?')[1] : '';
+        const params = new URLSearchParams(queryStr);
+        const q = String(params.get('q') || '').trim();
+        const limit = Math.min(20, Math.max(1, parseInt(params.get('limit') || '8', 10) || 8));
+        if (q.length < 1) {
+            return { status: true, data: { items: [], canCreate: false, createLabel: null } };
+        }
+        const needle = mockNormalizeSkillName(q);
+        const items = MOCK_SKILL_CATALOG.filter((s) =>
+            mockNormalizeSkillName(s.skill_name).includes(needle),
+        ).slice(0, limit);
+        const exact = MOCK_SKILL_CATALOG.some(
+            (s) => mockNormalizeSkillName(s.skill_name) === needle,
+        );
+        const canCreate = q.length >= 2 && !exact;
+        const createLabel = canCreate ? q.replace(/\s+/g, ' ').trim() : null;
+        return { status: true, data: { items, canCreate, createLabel } };
+    }
     if (pathNoTrailing.endsWith('/users/profile/skills') && method === 'POST') {
+        const list = [...(mockProfileMutable.skills_detailed || [])];
+        if (list.length >= 10) {
+            return { status: false, message: 'Maximum 10 skills allowed.', code: 'SKILLS_LIMIT' };
+        }
+        const rawName = String(body?.skill_name || '').trim().replace(/\s+/g, ' ');
+        if (!rawName && !body?.skill_id) {
+            return { status: false, message: 'Skill name is required.' };
+        }
+        let name = rawName;
+        if (body?.skill_id) {
+            const hit = MOCK_SKILL_CATALOG.find((s) => s.id === body.skill_id);
+            if (hit) name = hit.skill_name;
+        }
+        if (!name) {
+            return { status: false, message: 'Skill name is required.' };
+        }
+        const norm = mockNormalizeSkillName(name);
+        if (list.some((s) => mockNormalizeSkillName(s.name) === norm)) {
+            return {
+                status: false,
+                message: 'You already have this skill on your profile.',
+                code: 'DUPLICATE_SKILL',
+            };
+        }
+        if (!MOCK_SKILL_CATALOG.some((s) => mockNormalizeSkillName(s.skill_name) === norm)) {
+            MOCK_SKILL_CATALOG.push({
+                id: `ms-${Date.now()}`,
+                skill_name: name,
+            });
+        }
         let lvl = body?.level;
         if (lvl != null && lvl !== '') {
             const n = parseInt(String(lvl), 10);
@@ -816,8 +1053,8 @@ function matchRoute(method, url, body = {}) {
         } else {
             lvl = undefined;
         }
-        const row = { id: `sk-${Date.now()}`, name: body?.skill_name || 'Skill', level: lvl };
-        mockProfileMutable.skills_detailed = [...(mockProfileMutable.skills_detailed || []), row];
+        const row = { id: `sk-${Date.now()}`, name, level: lvl };
+        mockProfileMutable.skills_detailed = [...list, row];
         mockProfileMutable.skills = mockProfileMutable.skills_detailed.map((s) => s.name);
         return { status: true, data: { ...mockProfileMutable } };
     }

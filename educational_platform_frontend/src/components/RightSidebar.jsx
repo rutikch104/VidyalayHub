@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   MapPin, TrendingUp, Calendar, Users, Bell, Settings, Zap, BookOpen,
   Target, Crown, Sparkles, Loader2, UserPlus, ChevronRight, Star,
@@ -14,6 +14,10 @@ import ClickableUser from '@/components/ui/ClickableUser';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { PRESENCE_STATUS } from '@/lib/presence';
 import NoticeBoardModal from '@/components/NoticeBoardModal';
+
+/** Default cover when the user has not uploaded a profile banner */
+const HOME_PROFILE_COVER_FALLBACK =
+  'https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 /* ─── formatters ────────────────────────────────────────────────── */
 function formatEventRow(ev) {
@@ -73,7 +77,7 @@ const RightSidebar = ({ onNavigate }) => {
   const { user } = useAuth();
 
   const [summaryLoading,    setSummaryLoading]    = useState(true);
-  const [summary,           setSummary]           = useState({ posts_count: 0, connections_count: 0, likes_received: 0, location: null });
+  const [summary,           setSummary]           = useState({ posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null });
   const [trendingLoading,   setTrendingLoading]   = useState(true);
   const [trendingHashtags,  setTrendingHashtags]  = useState([]);
   const [trendingSkills,    setTrendingSkills]    = useState([]);
@@ -106,7 +110,7 @@ const RightSidebar = ({ onNavigate }) => {
     ]);
 
     if (results[0].status === 'fulfilled') setSummary(results[0].value);
-    else setSummary({ posts_count: 0, connections_count: 0, likes_received: 0, location: null });
+    else setSummary({ posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null });
     setSummaryLoading(false);
 
     if (results[1].status === 'fulfilled') {
@@ -129,6 +133,12 @@ const RightSidebar = ({ onNavigate }) => {
   useEffect(() => { void loadAll(); }, [loadAll]);
 
   const displayLocation = summary.location?.trim() || user?.location?.trim?.() || null;
+
+  const profileCoverSrc = useMemo(() => {
+    const raw = user?.cover_image_url || summary.cover_image_url;
+    if (raw) return resolveMediaUrl(raw) || raw;
+    return HOME_PROFILE_COVER_FALLBACK;
+  }, [user?.cover_image_url, summary.cover_image_url]);
 
   const handleConnect = async (targetId) => {
     setConnectBusyId(targetId);
@@ -161,13 +171,22 @@ const RightSidebar = ({ onNavigate }) => {
 
       {/* ── Profile card ── */}
       <div className="app-card overflow-hidden rounded-2xl p-0 ring-1 ring-border/45 shadow-professional">
-        {/* Banner */}
-        <div
-          className="relative h-[5.25rem] overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, hsl(213 94% 46%) 0%, hsl(250 75% 58%) 55%, hsl(213 94% 38%) 100%)' }}
-        >
-          <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-8 left-4 h-20 w-20 rounded-full bg-black/10 blur-xl" />
+        {/* Cover — profile banner image */}
+        <div className="relative h-[5.25rem] overflow-hidden">
+          <img
+            src={profileCoverSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => {
+              if (e.currentTarget.src !== HOME_PROFILE_COVER_FALLBACK) {
+                e.currentTarget.src = HOME_PROFILE_COVER_FALLBACK;
+              }
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-black/5"
+            aria-hidden
+          />
           <button
             type="button"
             onClick={() => onNavigate?.('settings')}

@@ -45,14 +45,15 @@ export default function LovableProfileTabs({ tabs, activeTab, onChange }) {
   }));
 
   return (
-    <div className="sticky top-[3.75rem] z-20 -mx-1 mb-4">
+    <div className="profile-feed-tabs sticky top-[3.75rem] z-20 mb-4 w-full min-w-0">
       <PlatformTabs
         tabs={platformTabs}
         activeKey={activeValue}
         onChange={(v) => onChange(tabValueToLabel(v, tabs))}
         ariaLabel="Profile sections"
         shell
-        shellClassName="backdrop-blur-xl"
+        shellClassName="profile-feed-tabs__shell"
+        className="profile-feed-tabs__tabs"
       />
     </div>
   );

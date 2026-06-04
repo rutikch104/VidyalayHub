@@ -305,21 +305,21 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
                 showName
                 showAvatar={false}
                 showStatus={false}
-                nameClassName="text-sm font-semibold"
+                nameClassName="text-[14px] font-bold tracking-tight text-foreground"
                 className="inline-flex !gap-0 !p-0 hover:!bg-transparent"
               />
               <Award className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-muted-foreground">· {formatTimeAgo(post.created_at)}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className="text-[12px] font-medium text-muted-foreground">· {formatTimeAgo(post.created_at)}</span>
+              <span className="rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground ring-1 ring-border/40">
                 {visibilityLabel}
               </span>
             </div>
-            <div className="mt-0.5 flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">{post.user?.title || 'Student'}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-[12.5px] font-medium text-muted-foreground tracking-tight">{post.user?.title || 'Student'}</p>
               <span className="text-muted-foreground/40">·</span>
               <div className="flex items-center gap-1">
                 {typeMeta.icon}
-                <span className="text-[11px] text-muted-foreground">{typeMeta.label}</span>
+                <span className="text-[11.5px] font-medium text-muted-foreground tracking-tight">{typeMeta.label}</span>
               </div>
             </div>
           </div>
@@ -470,7 +470,7 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
       )}
 
       {/* ── Stats row ── */}
-      <div className="mb-3 flex items-center gap-4 border-y border-border/50 py-2.5 text-xs text-muted-foreground">
+      <div className="mb-3 flex items-center gap-4 border-y border-border/40 py-2.5 text-[12.5px] font-medium text-muted-foreground tracking-tight">
         <button
           type="button"
           onClick={handleLike}
@@ -561,7 +561,7 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-foreground">Edit post</h3>
+              <h3 className="text-[17px] font-bold tracking-tight text-foreground">Edit post</h3>
               <button
                 type="button"
                 onClick={() => setEditOpen(false)}
@@ -578,7 +578,7 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
               rows={5}
             />
 
-            <p className="mb-2 text-sm font-medium text-foreground">Visibility</p>
+            <p className="mb-2 text-[13px] font-semibold text-foreground tracking-tight">Visibility</p>
             <div className="mb-4 flex flex-col gap-2">
               {[
                 { value: 'public',      label: 'Public' },
@@ -634,8 +634,8 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
             <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
               <Trash2 className="h-6 w-6 text-destructive" />
             </div>
-            <h3 className="mt-3 text-base font-semibold text-foreground">Delete post?</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h3 className="mt-3 text-[17px] font-bold tracking-tight text-foreground">Delete post?</h3>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted-foreground">
               This action cannot be undone. Comments and likes will be permanently removed.
             </p>
             <div className="mt-5 flex justify-end gap-2">

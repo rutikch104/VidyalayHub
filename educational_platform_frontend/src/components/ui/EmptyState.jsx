@@ -22,12 +22,12 @@ export default function EmptyState({
     >
       {Icon ? (
         <div className="platform-empty__icon">
-          <Icon className="h-7 w-7" aria-hidden />
+          <Icon className="h-7 w-7" strokeWidth={1.75} aria-hidden />
         </div>
       ) : null}
       {title ? <p className="platform-empty__title">{title}</p> : null}
       {description ? <p className="platform-empty__desc">{description}</p> : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {action ? <div className="mt-6">{action}</div> : null}
     </div>
   );
 }

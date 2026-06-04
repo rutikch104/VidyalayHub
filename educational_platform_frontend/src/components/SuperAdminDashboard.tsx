@@ -2,39 +2,55 @@ import React, { useCallback, useEffect, useState } from 'react';
 import superAdminService from '@/services/superAdminService';
 import SuperAdminAddCollegeModal from '@/components/SuperAdminAddCollegeModal';
 import SuperAdminCreateCollegeAdminModal from '@/components/SuperAdminCreateCollegeAdminModal';
+import SuperAdminCreateSuperAdminModal from '@/components/SuperAdminCreateSuperAdminModal';
+import {
+  SuperAdminShell,
+  SuperAdminContainer,
+  SuperAdminHeader,
+  SuperAdminStatusPill,
+  SuperAdminButton,
+  SuperAdminTabs,
+  SuperAdminContent,
+  SuperAdminKpiGrid,
+  SuperAdminKpiCard,
+  SuperAdminPanel,
+  SuperAdminSectionHead,
+  SuperAdminSearch,
+  SuperAdminFilterChips,
+  SuperAdminToolbar,
+  SuperAdminBadge,
+  SuperAdminAlert,
+  SuperAdminTableWrap,
+  SuperAdminEmpty,
+  statusToBadgeVariant,
+} from '@/components/superAdmin/SuperAdminUI';
 import {
   Shield,
   Building,
   Users,
-  GraduationCap,
   BarChart3,
-  Search,
   Plus,
-  MoreHorizontal,
-  Edit,
   Settings,
   Download,
   CheckCircle,
-  AlertCircle,
   Activity,
-  TrendingUp,
   Mail,
   MapPin,
   Crown,
   PieChart,
   LineChart,
-  DollarSign,
   Server,
   Wifi,
   HardDrive,
   Cpu,
-  UserCheck,
   Ban,
   RefreshCw,
   Check,
   X,
   Trash2,
   UserPlus,
+  UserCheck,
+  TrendingUp,
 } from 'lucide-react';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -103,16 +119,10 @@ export default function SuperAdminDashboard() {
   const [userListSearch, setUserListSearch] = useState('');
   const [userListTotal, setUserListTotal] = useState(0);
   const [ownerList, setOwnerList] = useState<any[]>([]);
-  const [creatingOwner, setCreatingOwner] = useState(false);
-  const [ownerForm, setOwnerForm] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    password: '',
-    phone_number: '',
-  });
   const [showAddCollege, setShowAddCollege] = useState(false);
   const [showCreateCollegeAdmin, setShowCreateCollegeAdmin] = useState(false);
+  const [showCreateSuperAdmin, setShowCreateSuperAdmin] = useState(false);
+  const [superAdminSuccess, setSuperAdminSuccess] = useState('');
   const [portalAdminInitialCollegeId, setPortalAdminInitialCollegeId] = useState<string | null>(null);
   const [portalAdminSuccess, setPortalAdminSuccess] = useState('');
   const [collegeBusyId, setCollegeBusyId] = useState<string | null>(null);
@@ -126,19 +136,9 @@ export default function SuperAdminDashboard() {
     { id: 'analytics', label: 'Analytics', icon: PieChart },
   ];
 
-  const getStatusBadge = (status: string) => {
-    const base = 'px-3 py-1 rounded-full text-xs font-medium border';
-    if (status === 'Active') return `${base} bg-green-100 text-green-800 border-green-200`;
-    if (status === 'Pending' || status === 'Trial') return `${base} bg-yellow-100 text-yellow-800 border-yellow-200`;
-    if (status === 'Suspended' || status === 'Expired') return `${base} bg-red-100 text-red-800 border-red-200`;
-    return `${base} bg-muted text-foreground border-border`;
-  };
-
-  const getPlanBadge = (plan: string) => {
-    const base = 'px-3 py-1 rounded-full text-xs font-medium border';
-    if (plan === 'Premium') return `${base} bg-blue-100 text-blue-800 border-blue-200`;
-    if (plan === 'Enterprise') return `${base} bg-purple-100 text-purple-800 border-purple-200`;
-    return `${base} bg-muted text-foreground border-border`;
+  const formatOwnerName = (owner: { first_name?: string; last_name?: string }) => {
+    const raw = [owner.first_name, owner.last_name].filter(Boolean).join(' ');
+    return raw || '—';
   };
 
   const handleExportColleges = async () => {
@@ -294,13 +294,20 @@ export default function SuperAdminDashboard() {
 
   if (accessDenied) {
     return (
-      <div className="min-h-[calc(100vh-5rem)] w-full px-4 py-12 sm:px-6 lg:px-8 flex items-center justify-center">
-        <div className="max-w-lg rounded-2xl border border-amber-200 bg-amber-50/90 p-8 shadow-lg text-center">
-          <Shield className="h-12 w-12 text-amber-600 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-foreground mb-2">Super Admin · Access restricted</h1>
-          <p className="text-foreground text-sm leading-relaxed">{accessDeniedMessage}</p>
-        </div>
-      </div>
+      <SuperAdminShell>
+        <SuperAdminContainer>
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <SuperAdminPanel title="Super Admin · Access restricted" subtitle={accessDeniedMessage}>
+              <div className="flex flex-col items-center py-6 text-center">
+                <div className="sa-portal__header-icon mb-4" style={{ background: 'linear-gradient(135deg, hsl(32 90% 44%) 0%, hsl(45 85% 48%) 100%)' }}>
+                  <Shield className="h-6 w-6" />
+                </div>
+                <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{accessDeniedMessage}</p>
+              </div>
+            </SuperAdminPanel>
+          </div>
+        </SuperAdminContainer>
+      </SuperAdminShell>
     );
   }
 
@@ -308,184 +315,106 @@ export default function SuperAdminDashboard() {
     ? allUsers.filter((u) => u.name?.toLowerCase().includes(userListSearch.toLowerCase()) || u.email?.toLowerCase().includes(userListSearch.toLowerCase()))
     : allUsers;
 
-  const handleCreateOwner = async () => {
-    setError('');
-    if (!ownerForm.first_name.trim() || !ownerForm.email.trim() || !ownerForm.password) {
-      setError('First name, email, and password are required to create super admin.');
-      return;
-    }
-    try {
-      setCreatingOwner(true);
-      await superAdminService.createSuperAdminOwner({
-        first_name: ownerForm.first_name.trim(),
-        last_name: ownerForm.last_name.trim() || undefined,
-        email: ownerForm.email.trim().toLowerCase(),
-        password: ownerForm.password,
-        phone_number: ownerForm.phone_number.trim() || undefined,
-      });
-      const owners = await superAdminService.getSuperAdminOwners();
-      setOwnerList(owners || []);
-      setOwnerForm({ first_name: '', last_name: '', email: '', password: '', phone_number: '' });
-    } catch (e) {
-      setError(getAxiosMessage(e) || (e instanceof Error ? e.message : 'Failed to create super admin'));
-    } finally {
-      setCreatingOwner(false);
-    }
-  };
-
   return (
-    <div className="min-h-[calc(100vh-5rem)] w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="bg-card/90 backdrop-blur-sm border-b border-border/50 sticky top-16 z-40">
-        <div className="platform-page__container mx-auto max-w-[1440px] px-6 py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg shrink-0">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Super Admin Portal
-                </h1>
-                <p className="text-muted-foreground mt-1">Manage all colleges and platform operations</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex shrink-0 items-center space-x-2 px-4 py-2 bg-green-100 text-green-800 rounded-xl border border-green-200">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium">System Healthy</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleExportColleges()}
-                disabled={exporting}
-                className="flex items-center space-x-2 px-4 py-2 bg-card border border-border rounded-xl hover:bg-muted/50 transition-all duration-200 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{exporting ? 'Exporting…' : 'Export Report'}</span>
-              </button>
-              <button className="p-2 bg-card border border-border rounded-xl hover:bg-muted/50 transition-all duration-200">
-                <Settings className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-          <div className="flex space-x-6 sm:space-x-8 border-b border-border overflow-x-auto scrollbar-hide whitespace-nowrap pb-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 bg-gradient-to-t from-blue-50/50 to-transparent'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }`}
-              >
-                <tab.icon className="h-5 w-5" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+    <SuperAdminShell>
+      <SuperAdminContainer>
+        <SuperAdminHeader
+          title="Super Admin Portal"
+          subtitle="Manage all colleges and platform operations"
+          actions={
+            <>
+              <SuperAdminStatusPill />
+              <SuperAdminButton onClick={() => void handleExportColleges()} disabled={exporting}>
+                <Download className="h-4 w-4" />
+                <span>{exporting ? 'Exporting…' : 'Export Report'}</span>
+              </SuperAdminButton>
+              <SuperAdminButton variant="ghost" title="Settings">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </SuperAdminButton>
+            </>
+          }
+        />
 
-      <div className="platform-page__container mx-auto max-w-[1440px] px-6 py-8">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-            {loading && <div className="text-center text-muted-foreground py-4">Loading overview…</div>}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-xl"><p className="text-blue-100 text-sm">Total Colleges</p><p className="text-3xl font-bold">{systemMetrics.totalColleges}</p></div>
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6 text-white shadow-xl"><p className="text-green-100 text-sm">Total Students</p><p className="text-3xl font-bold">{systemMetrics.totalStudents.toLocaleString()}</p></div>
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-xl"><p className="text-purple-100 text-sm">Total Teachers</p><p className="text-3xl font-bold">{systemMetrics.totalTeachers.toLocaleString()}</p></div>
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white shadow-xl"><p className="text-orange-100 text-sm">Active Users</p><p className="text-3xl font-bold">{systemMetrics.activeUsers.toLocaleString()}</p></div>
-            </div>
-            <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border/50 p-6 shadow-lg">
-              <h3 className="text-xl font-bold text-foreground mb-6">Recent Platform Activity</h3>
-              <div className="space-y-3">
-                {platformActivities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No activity to show.</p>
-                ) : (
-                  platformActivities.map((a) => (
-                    <div key={a.id} className="flex items-center space-x-3 p-3 bg-blue-50 rounded-xl">
-                      <CheckCircle className="h-5 w-5 text-blue-600" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{a.message}</p>
-                        {a.details ? <p className="text-xs text-muted-foreground truncate">{a.details}</p> : null}
+        <SuperAdminTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+        <SuperAdminContent>
+          {activeTab === 'overview' && (
+            <>
+              {error ? <SuperAdminAlert variant="error">{error}</SuperAdminAlert> : null}
+              {loading ? <SuperAdminAlert variant="loading">Loading overview…</SuperAdminAlert> : null}
+              <SuperAdminKpiGrid>
+                <SuperAdminKpiCard label="Total Colleges" value={systemMetrics.totalColleges} icon={Building} tone="indigo" />
+                <SuperAdminKpiCard label="Total Students" value={systemMetrics.totalStudents.toLocaleString()} icon={Users} tone="emerald" />
+                <SuperAdminKpiCard label="Total Teachers" value={systemMetrics.totalTeachers.toLocaleString()} icon={UserCheck} tone="violet" />
+                <SuperAdminKpiCard label="Active Users" value={systemMetrics.activeUsers.toLocaleString()} icon={Activity} tone="amber" />
+              </SuperAdminKpiGrid>
+              <SuperAdminPanel title="Recent Platform Activity" subtitle="Latest events across all tenants">
+                <div className="sa-activity-list">
+                  {platformActivities.length === 0 ? (
+                    <SuperAdminEmpty>No activity to show.</SuperAdminEmpty>
+                  ) : (
+                    platformActivities.map((a) => (
+                      <div key={a.id} className="sa-activity-item">
+                        <CheckCircle className="sa-activity-item__icon h-4 w-4" aria-hidden />
+                        <div className="sa-activity-item__text">
+                          <p className="sa-activity-item__title">{a.message}</p>
+                          {a.details ? <p className="sa-activity-item__meta">{a.details}</p> : null}
+                        </div>
+                        <span className="sa-activity-item__time">{new Date(a.timestamp).toLocaleDateString()}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{new Date(a.timestamp).toLocaleDateString()}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+                    ))
+                  )}
+                </div>
+              </SuperAdminPanel>
+            </>
+          )}
 
         {activeTab === 'colleges' && (
-          <div className="space-y-6">
-            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-            {portalAdminSuccess ? (
-              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{portalAdminSuccess}</div>
-            ) : null}
-            {(loading || collegesLoading) && <div className="text-center text-muted-foreground py-2">Loading colleges…</div>}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">Colleges Management</h2>
-                <p className="text-muted-foreground mt-1">Manage all tenant colleges and their subscriptions</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPortalAdminSuccess('');
-                    setPortalAdminInitialCollegeId(null);
-                    setShowCreateCollegeAdmin(true);
-                  }}
-                  className="border border-border bg-card text-foreground px-5 py-3 rounded-xl flex items-center space-x-2 hover:bg-muted/50"
-                >
-                  <UserPlus className="h-5 w-5" />
-                  <span>Create college admin</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCollege(true)}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 hover:opacity-95"
-                >
-                  <Plus className="h-5 w-5" />
-                  <span>Add College</span>
-                </button>
-              </div>
-            </div>
-            <div className="bg-card/90 rounded-2xl border border-border/50 p-6 shadow-lg">
-              <div className="flex flex-col lg:flex-row gap-4 items-center">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search colleges..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-border rounded-xl"
-                  />
-                </div>
-                <div className="flex items-center space-x-3">
-                  {['All', 'Active', 'Inactive', 'Suspended', 'Trial'].map((filter) => (
-                    <button
-                      key={filter}
-                      onClick={() => setSelectedFilter(filter)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        selectedFilter === filter ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' : 'bg-card text-muted-foreground border border-border'
-                      }`}
+            <>
+              {error ? <SuperAdminAlert variant="error">{error}</SuperAdminAlert> : null}
+              {portalAdminSuccess ? <SuperAdminAlert variant="success">{portalAdminSuccess}</SuperAdminAlert> : null}
+              {(loading || collegesLoading) ? <SuperAdminAlert variant="loading">Loading colleges…</SuperAdminAlert> : null}
+
+              <SuperAdminSectionHead
+                title="Colleges Management"
+                description="Manage all tenant colleges and their subscriptions"
+                actions={
+                  <div className="flex flex-wrap gap-2">
+                    <SuperAdminButton
+                      onClick={() => {
+                        setPortalAdminSuccess('');
+                        setPortalAdminInitialCollegeId(null);
+                        setShowCreateCollegeAdmin(true);
+                      }}
                     >
-                      {filter}
-                    </button>
-                  ))}
+                      <UserPlus className="h-4 w-4" />
+                      <span>Create college admin</span>
+                    </SuperAdminButton>
+                    <SuperAdminButton variant="success" onClick={() => setShowAddCollege(true)}>
+                      <Plus className="h-4 w-4" />
+                      <span>Add College</span>
+                    </SuperAdminButton>
+                  </div>
+                }
+              />
+
+              <SuperAdminPanel flush>
+                <div className="sa-panel__body">
+                  <SuperAdminToolbar>
+                    <SuperAdminSearch value={searchTerm} onChange={setSearchTerm} placeholder="Search colleges…" />
+                    <SuperAdminFilterChips
+                      options={['All', 'Active', 'Inactive', 'Suspended', 'Trial']}
+                      value={selectedFilter}
+                      onChange={setSelectedFilter}
+                    />
+                  </SuperAdminToolbar>
                 </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {colleges.length === 0 && !collegesLoading ? (
-                <p className="col-span-full text-center text-muted-foreground py-8">No colleges match this filter.</p>
-              ) : null}
+              </SuperAdminPanel>
+
+              <div className="sa-college-grid">
+                {colleges.length === 0 && !collegesLoading ? (
+                  <SuperAdminEmpty>No colleges match this filter.</SuperAdminEmpty>
+                ) : null}
               {colleges.map((college) => {
                 const busy = collegeBusyId === college.id;
                 const sub = college.subscription;
@@ -499,293 +428,360 @@ export default function SuperAdminDashboard() {
                 const adminEmail = college.admin?.email;
 
                 return (
-                  <div key={college.id} className="bg-card/90 rounded-2xl border border-border/50 p-6 shadow-lg">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-4 min-w-0">
-                        <div className="w-16 h-16 shrink-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
-                          <Building className="h-8 w-8 text-white" />
+                  <article key={college.id} className="sa-college-card">
+                    <div className="sa-college-card__head">
+                      <div className="sa-college-card__brand">
+                        <div className="sa-college-card__logo" aria-hidden>
+                          <Building className="h-7 w-7" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-xl font-bold text-foreground truncate">{college.name}</h3>
-                          <p className="text-muted-foreground">{college.type}</p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground truncate">{college.location || '—'}</span>
+                          <h3 className="sa-college-card__name">{college.name}</h3>
+                          <p className="text-sm text-muted-foreground">{college.type}</p>
+                          <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">{college.location || '—'}</span>
                           </div>
                           {adminEmail ? (
-                            <p className="text-xs text-muted-foreground mt-1 truncate" title={adminEmail}>
+                            <p className="mt-1 truncate text-xs text-muted-foreground" title={adminEmail}>
                               Contact: {adminEmail}
                             </p>
                           ) : null}
                         </div>
                       </div>
-                      <span className={getStatusBadge(college.status)}>{college.status}</span>
+                      <SuperAdminBadge variant={statusToBadgeVariant(college.status)}>{college.status}</SuperAdminBadge>
                     </div>
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-4 border border-blue-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={getPlanBadge(planLabel)}>{planLabel}</span>
-                        <span className="text-lg font-bold text-foreground">{feeLabel}</span>
+                    <div className="sa-college-card__subplan">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <SuperAdminBadge variant="plan">{planLabel}</SuperAdminBadge>
+                        <span className="text-base font-bold">{feeLabel}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Expires: {expiryLabel}</span>
-                        <span className={getStatusBadge(subStatus)}>{subStatus}</span>
+                        <SuperAdminBadge variant={statusToBadgeVariant(subStatus)}>{subStatus}</SuperAdminBadge>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">{(college.users?.students ?? 0).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Students</p>
+                    <div className="sa-college-card__stats">
+                      <div className="sa-college-card__stat">
+                        <p className="sa-college-card__stat-value text-[hsl(239_58%_52%)]">{(college.users?.students ?? 0).toLocaleString()}</p>
+                        <p className="sa-college-card__stat-label">Students</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">{college.users?.teachers ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Teachers</p>
+                      <div className="sa-college-card__stat">
+                        <p className="sa-college-card__stat-value text-[hsl(152_55%_38%)]">{college.users?.teachers ?? 0}</p>
+                        <p className="sa-college-card__stat-label">Teachers</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-purple-600">{college.users?.staff ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Staff</p>
+                      <div className="sa-college-card__stat">
+                        <p className="sa-college-card__stat-value text-[hsl(262_55%_52%)]">{college.users?.staff ?? 0}</p>
+                        <p className="sa-college-card__stat-label">Staff</p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="sa-college-card__actions">
                       {pendingLike ? (
                         <>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void handleCollegeStatusChange(college.id, 'Active')}
-                            className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-                          >
+                          <SuperAdminButton variant="success" disabled={busy} onClick={() => void handleCollegeStatusChange(college.id, 'Active')}>
                             <Check className="h-4 w-4" />
                             Approve
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void handleCollegeStatusChange(college.id, 'Inactive')}
-                            className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1 border border-red-200 bg-red-50 text-red-800 py-2 rounded-lg text-sm font-medium hover:bg-red-100 disabled:opacity-50"
-                          >
+                          </SuperAdminButton>
+                          <SuperAdminButton disabled={busy} onClick={() => void handleCollegeStatusChange(college.id, 'Inactive')}>
                             <X className="h-4 w-4" />
                             Reject
-                          </button>
+                          </SuperAdminButton>
                         </>
                       ) : null}
                       {college.status === 'Active' ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void handleCollegeStatusChange(college.id, 'Inactive')}
-                          className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1 border border-border bg-card py-2 rounded-lg text-sm font-medium hover:bg-muted/50 disabled:opacity-50"
-                        >
+                        <SuperAdminButton disabled={busy} onClick={() => void handleCollegeStatusChange(college.id, 'Inactive')}>
                           <Ban className="h-4 w-4" />
                           Deactivate
-                        </button>
+                        </SuperAdminButton>
                       ) : null}
                       {(college.status === 'Inactive' || college.status === 'Suspended') && !pendingLike ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void handleCollegeStatusChange(college.id, 'Active')}
-                          className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-                        >
+                        <SuperAdminButton variant="primary" disabled={busy} onClick={() => void handleCollegeStatusChange(college.id, 'Active')}>
                           <Check className="h-4 w-4" />
                           {college.status === 'Suspended' ? 'Reactivate' : 'Approve again'}
-                        </button>
+                        </SuperAdminButton>
                       ) : null}
                       {adminEmail ? (
-                        <a
-                          href={`mailto:${adminEmail}`}
-                          className="p-2 text-muted-foreground hover:bg-muted rounded-lg border border-transparent hover:border-border"
-                          title="Email admin"
-                        >
-                          <Mail className="h-4 w-4" />
-                        </a>
+                        <SuperAdminButton variant="ghost" title="Email admin" className="!min-w-0 !flex-none">
+                          <a href={`mailto:${adminEmail}`} className="inline-flex">
+                            <Mail className="h-4 w-4" />
+                          </a>
+                        </SuperAdminButton>
                       ) : (
-                        <span className="p-2 text-muted-foreground/40 rounded-lg" title="No admin email">
-                          <Mail className="h-4 w-4" />
-                        </span>
+                        <SuperAdminButton variant="ghost" disabled title="No admin email" className="!min-w-0 !flex-none">
+                          <Mail className="h-4 w-4 opacity-40" />
+                        </SuperAdminButton>
                       )}
-                      <button
-                        type="button"
+                      <SuperAdminButton
+                        variant="ghost"
                         disabled={busy}
-                        onClick={() => void handleDeleteCollege(college.id, college.name)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 disabled:opacity-50"
                         title="Delete college"
+                        className="!min-w-0 !flex-none text-red-600 hover:bg-red-50"
+                        onClick={() => void handleDeleteCollege(college.id, college.name)}
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
+                      </SuperAdminButton>
+                      <SuperAdminButton
                         disabled={busy}
                         onClick={() => {
                           setPortalAdminSuccess('');
                           setPortalAdminInitialCollegeId(college.id);
                           setShowCreateCollegeAdmin(true);
                         }}
-                        className="w-full sm:w-auto sm:flex-1 min-w-[140px] inline-flex items-center justify-center gap-1 border border-indigo-200 bg-indigo-50 text-indigo-900 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 disabled:opacity-50"
-                        title="Create login for this college’s admin portal"
+                        title="Create login for this college admin portal"
                       >
                         <UserPlus className="h-4 w-4" />
                         Create admin
-                      </button>
+                      </SuperAdminButton>
                     </div>
-                    {busy ? <p className="text-xs text-muted-foreground mt-2">Updating…</p> : null}
-                  </div>
+                    {busy ? <p className="mt-2 text-xs text-muted-foreground">Updating…</p> : null}
+                  </article>
                 );
               })}
-            </div>
-          </div>
-        )}
+              </div>
+            </>
+          )}
 
-        {activeTab === 'users' && (
-          <div className="space-y-6">
-            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl p-4 text-white"><p className="text-blue-100 text-sm">Total users</p><p className="text-2xl font-bold">{userListTotal.toLocaleString()}</p></div>
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-4 text-white"><p className="text-green-100 text-sm">Active</p><p className="text-2xl font-bold">{systemMetrics.activeUsers.toLocaleString()}</p></div>
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-4 text-white"><p className="text-purple-100 text-sm">New this week</p><p className="text-2xl font-bold">{allUsers.filter((u) => Date.now() - new Date(u.created_at).getTime() < 7 * 86400000).length}</p></div>
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-4 text-white"><p className="text-orange-100 text-sm">Not approved</p><p className="text-2xl font-bold">{allUsers.filter((u) => u.status !== 'Active').length}</p></div>
-            </div>
-            <div className="bg-card/90 rounded-2xl border border-border/50 p-6 shadow-lg">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-foreground">Super Admin Owners</h3>
-                <span className="text-sm text-muted-foreground">{ownerList.length} total</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                <input className="border border-border rounded-lg px-3 py-2" placeholder="First name*" value={ownerForm.first_name} onChange={(e) => setOwnerForm((p) => ({ ...p, first_name: e.target.value }))} />
-                <input className="border border-border rounded-lg px-3 py-2" placeholder="Last name" value={ownerForm.last_name} onChange={(e) => setOwnerForm((p) => ({ ...p, last_name: e.target.value }))} />
-                <input className="border border-border rounded-lg px-3 py-2" placeholder="Email*" type="email" value={ownerForm.email} onChange={(e) => setOwnerForm((p) => ({ ...p, email: e.target.value }))} />
-                <input className="border border-border rounded-lg px-3 py-2" placeholder="Password*" type="password" value={ownerForm.password} onChange={(e) => setOwnerForm((p) => ({ ...p, password: e.target.value }))} />
-                <button type="button" onClick={() => void handleCreateOwner()} disabled={creatingOwner} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-4 py-2 disabled:opacity-60">
-                  {creatingOwner ? 'Creating…' : 'Create Super Admin'}
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Name</th>
-                      <th className="px-4 py-2 text-left">Email</th>
-                      <th className="px-4 py-2 text-left">Access</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {ownerList.map((owner) => (
-                      <tr key={owner.id}>
-                        <td className="px-4 py-2">{[owner.first_name, owner.last_name].filter(Boolean).join(' ') || '—'}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{owner.email}</td>
-                        <td className="px-4 py-2">
-                          <span className={owner.access ? 'px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' : 'px-2 py-1 rounded-full text-xs bg-red-100 text-red-800'}>
-                            {owner.access ? 'Active' : 'Disabled'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {ownerList.length === 0 ? (
-                      <tr><td className="px-4 py-3 text-muted-foreground" colSpan={3}>No super admin owners found.</td></tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="bg-card/90 rounded-2xl border border-border/50 overflow-hidden shadow-lg">
-              <div className="p-6 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-foreground">Users</h3>
-                  <div className="relative w-full max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input value={userListSearch} onChange={(e) => setUserListSearch(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-border rounded-lg" placeholder="Filter loaded users…" />
+          {activeTab === 'users' && (
+            <>
+              {error ? <SuperAdminAlert variant="error">{error}</SuperAdminAlert> : null}
+              <SuperAdminKpiGrid>
+                <SuperAdminKpiCard label="Total users" value={userListTotal.toLocaleString()} icon={Users} tone="indigo" />
+                <SuperAdminKpiCard label="Active" value={systemMetrics.activeUsers.toLocaleString()} icon={UserCheck} tone="emerald" />
+                <SuperAdminKpiCard
+                  label="New this week"
+                  value={allUsers.filter((u) => Date.now() - new Date(u.created_at).getTime() < 7 * 86400000).length}
+                  icon={TrendingUp}
+                  tone="violet"
+                />
+                <SuperAdminKpiCard
+                  label="Not approved"
+                  value={allUsers.filter((u) => u.status !== 'Active').length}
+                  icon={Ban}
+                  tone="amber"
+                />
+              </SuperAdminKpiGrid>
+
+              <SuperAdminPanel
+                title="Super Admin Owners"
+                subtitle="Owner-level accounts that bypass tenant scoping."
+                headerExtra={
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-muted-foreground">{ownerList.length} total</span>
+                    <SuperAdminButton
+                      variant="primary"
+                      onClick={() => {
+                        setSuperAdminSuccess('');
+                        setError('');
+                        setShowCreateSuperAdmin(true);
+                      }}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Create super admin
+                    </SuperAdminButton>
                   </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tenant</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Joined</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-muted/50">
-                        <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{u.user_type}</td>
-                        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{u.tenant_id?.slice?.(0, 8)}…</td>
-                        <td className="px-4 py-3"><span className={u.status === 'Active' ? 'px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' : 'px-2 py-1 rounded-full text-xs bg-muted text-foreground'}>{u.status}</span></td>
-                        <td className="px-4 py-3 text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+                }
+                flush
+              >
+                {superAdminSuccess ? (
+                  <div className="sa-panel__body pb-0">
+                    <SuperAdminAlert variant="success">{superAdminSuccess}</SuperAdminAlert>
+                  </div>
+                ) : null}
+                <SuperAdminTableWrap>
+                  <table className="sa-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Access</th>
+                        <th>Created</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+                    </thead>
+                    <tbody>
+                      {ownerList.map((owner) => (
+                        <tr key={owner.id}>
+                          <td className="font-medium">{formatOwnerName(owner)}</td>
+                          <td className="sa-table__cell-muted">{owner.email}</td>
+                          <td className="sa-table__cell-muted">{owner.phone_number || '—'}</td>
+                          <td>
+                            <SuperAdminBadge variant={owner.access ? 'success' : 'danger'}>
+                              {owner.access ? 'Active' : 'Disabled'}
+                            </SuperAdminBadge>
+                          </td>
+                          <td className="sa-table__cell-muted">
+                            {owner.created_at ? new Date(owner.created_at).toLocaleDateString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                      {ownerList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="sa-table__cell-muted">
+                            No super admin owners found.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </SuperAdminTableWrap>
+              </SuperAdminPanel>
 
-        {activeTab === 'subscriptions' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-foreground">Subscription Management</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-6 text-white"><p className="text-green-100 text-sm">Monthly Revenue</p><p className="text-3xl font-bold">₹{systemMetrics.revenue > 0 ? (systemMetrics.revenue / 100000).toFixed(1) : '0'}L</p></div>
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl p-6 text-white"><p className="text-blue-100 text-sm">Active Subscriptions</p><p className="text-3xl font-bold">{colleges.filter((c) => c.subscription?.status === 'Active').length}</p></div>
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white"><p className="text-orange-100 text-sm">Overdue Payments</p><p className="text-3xl font-bold">{colleges.filter((c) => c.subscription?.status === 'Expired').length}</p></div>
-            </div>
-          </div>
-        )}
+              <SuperAdminPanel
+                title="Users"
+                headerExtra={
+                  <SuperAdminSearch
+                    value={userListSearch}
+                    onChange={setUserListSearch}
+                    placeholder="Filter loaded users…"
+                    className="max-w-md"
+                  />
+                }
+                headerStack
+                flush
+              >
+                <SuperAdminTableWrap>
+                  <table className="sa-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Tenant</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="sa-table__cell-muted">
+                            No users match your filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map((u) => (
+                          <tr key={u.id}>
+                            <td className="font-medium">{u.name}</td>
+                            <td className="sa-table__cell-muted">{u.email}</td>
+                            <td className="sa-table__cell-muted capitalize">{u.user_type}</td>
+                            <td className="sa-table__cell-muted sa-table__cell-mono" title={u.tenant_id}>
+                              {u.tenant_id?.slice?.(0, 8)}…
+                            </td>
+                            <td>
+                              <SuperAdminBadge variant={statusToBadgeVariant(u.status)}>{u.status}</SuperAdminBadge>
+                            </td>
+                            <td className="sa-table__cell-muted">
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </SuperAdminTableWrap>
+              </SuperAdminPanel>
+            </>
+          )}
 
-        {activeTab === 'system' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-foreground">System Health & Monitoring</h2>
-              <button className="bg-gradient-to-r from-red-600 to-pink-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2">
-                <RefreshCw className="h-5 w-5" />
-                <span>Refresh Data</span>
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-card rounded-xl border border-border p-6"><Cpu className="h-6 w-6 mb-2 text-blue-600" /><p className="text-2xl font-bold">{health.serverLoad}%</p><p className="text-sm text-muted-foreground">CPU</p></div>
-              <div className="bg-card rounded-xl border border-border p-6"><HardDrive className="h-6 w-6 mb-2 text-green-600" /><p className="text-2xl font-bold">{health.storageUsed}%</p><p className="text-sm text-muted-foreground">Storage</p></div>
-              <div className="bg-card rounded-xl border border-border p-6"><Wifi className="h-6 w-6 mb-2 text-purple-600" /><p className="text-2xl font-bold">{health.uptime}%</p><p className="text-sm text-muted-foreground">Uptime</p></div>
-              <div className="bg-card rounded-xl border border-border p-6"><Activity className="h-6 w-6 mb-2 text-orange-600" /><p className="text-2xl font-bold">{systemMetrics.activeUsers.toLocaleString()}</p><p className="text-sm text-muted-foreground">Active users</p></div>
-            </div>
-          </div>
-        )}
+          {activeTab === 'subscriptions' && (
+            <>
+              <SuperAdminSectionHead title="Subscription Management" description="Revenue and billing across all tenants" />
+              <SuperAdminKpiGrid cols={3}>
+                <SuperAdminKpiCard
+                  label="Monthly Revenue"
+                  value={`₹${systemMetrics.revenue > 0 ? (systemMetrics.revenue / 100000).toFixed(1) : '0'}L`}
+                  icon={Crown}
+                  tone="emerald"
+                />
+                <SuperAdminKpiCard
+                  label="Active Subscriptions"
+                  value={colleges.filter((c) => c.subscription?.status === 'Active').length}
+                  icon={CheckCircle}
+                  tone="indigo"
+                />
+                <SuperAdminKpiCard
+                  label="Overdue Payments"
+                  value={colleges.filter((c) => c.subscription?.status === 'Expired').length}
+                  icon={Ban}
+                  tone="rose"
+                />
+              </SuperAdminKpiGrid>
+            </>
+          )}
 
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            {analyticsLoading && <div className="text-center text-muted-foreground py-4">Loading analytics…</div>}
-            <h2 className="text-2xl font-bold text-foreground">Platform Analytics</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <h3 className="text-lg font-bold mb-4 flex items-center"><LineChart className="h-5 w-5 mr-2 text-blue-600" />Users by role</h3>
-                <ul className="space-y-2 text-sm">
-                  {(platformAnalytics?.userGrowth?.labels || []).map((label: string, i: number) => (
-                    <li key={`${label}-${i}`} className="flex justify-between border-b border-border pb-2">
-                      <span className="capitalize">{label}</span>
-                      <span className="font-semibold">{platformAnalytics?.userGrowth?.datasets?.[0]?.data?.[i] ?? '—'}</span>
-                    </li>
-                  ))}
-                </ul>
+          {activeTab === 'system' && (
+            <>
+              <SuperAdminSectionHead
+                title="System Health & Monitoring"
+                description="Infrastructure metrics and platform uptime"
+                actions={
+                  <SuperAdminButton variant="primary">
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh Data
+                  </SuperAdminButton>
+                }
+              />
+              <SuperAdminKpiGrid>
+                <SuperAdminKpiCard label="CPU Load" value={`${health.serverLoad}%`} icon={Cpu} tone="indigo" />
+                <SuperAdminKpiCard label="Storage Used" value={`${health.storageUsed}%`} icon={HardDrive} tone="emerald" />
+                <SuperAdminKpiCard label="Uptime" value={`${health.uptime}%`} icon={Wifi} tone="violet" />
+                <SuperAdminKpiCard label="Active Users" value={systemMetrics.activeUsers.toLocaleString()} icon={Activity} tone="amber" />
+              </SuperAdminKpiGrid>
+              <SuperAdminPanel title="Database" subtitle={`Connection status: ${health.db}`}>
+                <p className="text-sm text-muted-foreground">
+                  Monitor server load, storage, and uptime from this dashboard. Use refresh to pull the latest health snapshot.
+                </p>
+              </SuperAdminPanel>
+            </>
+          )}
+
+          {activeTab === 'analytics' && (
+            <>
+              {analyticsLoading ? <SuperAdminAlert variant="loading">Loading analytics…</SuperAdminAlert> : null}
+              <SuperAdminSectionHead title="Platform Analytics" description="User distribution and college status breakdown" />
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <SuperAdminPanel
+                  title="Users by role"
+                  headerExtra={<LineChart className="h-5 w-5 text-[hsl(239_58%_52%)]" aria-hidden />}
+                >
+                  <div className="sa-stat-list">
+                    {(platformAnalytics?.userGrowth?.labels || []).length === 0 ? (
+                      <SuperAdminEmpty>No user role data available.</SuperAdminEmpty>
+                    ) : (
+                      (platformAnalytics?.userGrowth?.labels || []).map((label: string, i: number) => (
+                        <div key={`${label}-${i}`} className="sa-stat-list__row">
+                          <span className="capitalize">{label}</span>
+                          <span className="sa-stat-list__value">
+                            {platformAnalytics?.userGrowth?.datasets?.[0]?.data?.[i] ?? '—'}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </SuperAdminPanel>
+                <SuperAdminPanel
+                  title="Colleges by status"
+                  headerExtra={<PieChart className="h-5 w-5 text-[hsl(152_55%_38%)]" aria-hidden />}
+                >
+                  <div className="sa-stat-list">
+                    {(platformAnalytics?.collegeDistribution?.labels || []).length === 0 ? (
+                      <SuperAdminEmpty>No college distribution data available.</SuperAdminEmpty>
+                    ) : (
+                      (platformAnalytics?.collegeDistribution?.labels || []).map((label: string, i: number) => (
+                        <div key={`${label}-${i}`} className="sa-stat-list__row">
+                          <span>{label}</span>
+                          <span className="sa-stat-list__value">
+                            {platformAnalytics?.collegeDistribution?.datasets?.[0]?.data?.[i] ?? '—'}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </SuperAdminPanel>
               </div>
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <h3 className="text-lg font-bold mb-4 flex items-center"><PieChart className="h-5 w-5 mr-2 text-green-600" />Colleges by status</h3>
-                <ul className="space-y-2 text-sm">
-                  {(platformAnalytics?.collegeDistribution?.labels || []).map((label: string, i: number) => (
-                    <li key={`${label}-${i}`} className="flex justify-between border-b border-border pb-2">
-                      <span>{label}</span>
-                      <span className="font-semibold">{platformAnalytics?.collegeDistribution?.datasets?.[0]?.data?.[i] ?? '—'}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+            </>
+          )}
+        </SuperAdminContent>
+      </SuperAdminContainer>
 
       <SuperAdminAddCollegeModal
         open={showAddCollege}
@@ -814,6 +810,20 @@ export default function SuperAdminDashboard() {
         }}
         onError={(msg: string) => setError(msg || '')}
       />
-    </div>
+
+      <SuperAdminCreateSuperAdminModal
+        open={showCreateSuperAdmin}
+        onClose={() => setShowCreateSuperAdmin(false)}
+        onSuccess={(createdEmail: string) => {
+          setError('');
+          setSuperAdminSuccess(`Super admin created for ${createdEmail}. They can sign in at /super-admin-login.`);
+          void superAdminService
+            .getSuperAdminOwners()
+            .then((owners) => setOwnerList(owners || []))
+            .catch(() => undefined);
+        }}
+        onError={(msg: string) => setError(msg || '')}
+      />
+    </SuperAdminShell>
   );
 }

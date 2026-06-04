@@ -40,12 +40,12 @@ export default function PageHeader({
         <div className="min-w-0">
           {badge ? (
             <div className="platform-hero__badge">
-              {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden /> : null}
+              {Icon ? <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden /> : null}
               {badge}
             </div>
           ) : Icon && !badge ? (
             <div className="platform-hero__badge">
-              <Icon className="h-3.5 w-3.5" aria-hidden />
+              <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden />
             </div>
           ) : null}
           <h1 className="platform-hero__title">{title}</h1>

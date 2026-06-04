@@ -13,6 +13,11 @@ export {
   LovableProfileTabs,
   LovableProfileSidebar,
 } from '@/components/profile/lovable';
-export { default as ProfileSkillsGrid } from './ProfileSkillsGrid';
-export { default as ProfileExperienceTimeline } from './ProfileExperienceTimeline';
+export { default as ProfileSkillsGrid, collectSkillNames } from './ProfileSkillsGrid';
+export { default as ProfileExperienceTimeline, ProfileExperienceEntry } from './ProfileExperienceTimeline';
+export {
+  default as ProfileEducationList,
+  ProfileEducationEntry,
+  ProfileEducationSectionBody,
+} from './ProfileEducationList';
 export { default as ProfileStatCards } from './ProfileStatCards';

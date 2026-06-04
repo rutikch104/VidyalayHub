@@ -39,6 +39,7 @@ export function mapPublicProfileToLayout(response) {
       : [];
 
   const experienceList = Array.isArray(response.experience_list) ? response.experience_list : [];
+  const educationList = Array.isArray(response.education_list) ? response.education_list : [];
   const skillsDetailed = Array.isArray(response.skills_detailed) ? response.skills_detailed : [];
   const teachingInfo =
     response.teaching_info && typeof response.teaching_info === 'object'
@@ -60,7 +61,10 @@ export function mapPublicProfileToLayout(response) {
       response.title ||
       (safeUt === 'teacher' ? 'Teacher' : safeUt === 'alumni' ? 'Alumni' : 'Student'),
     userType: safeUt,
-    phone: response.phone || '',
+    phone: response.phone || response.phone_number || '',
+    email: response.email || '',
+    show_email: !!response.show_email,
+    show_phone: !!response.show_phone,
     avatar: avatarSrc,
     coverImage: coverSrc,
     location: response.location || '',
@@ -101,6 +105,7 @@ export function mapPublicProfileToLayout(response) {
       skillsDetailed,
       certifications: response.certifications || [],
     },
+    educationList,
     achievements: achievementsList,
     clubs: response.clubs || [],
     events: response.events || [],

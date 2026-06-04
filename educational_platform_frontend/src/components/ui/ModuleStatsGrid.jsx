@@ -31,12 +31,12 @@ export default function ModuleStatsGrid({ items = [], theme = 'sky', className }
             {Icon ? (
               <div
                 className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/[0.04]',
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/[0.04]',
                   `platform-stat__icon-wrap platform-stat__icon-wrap--${theme}`,
                 )}
                 aria-hidden
               >
-                <Icon className={cn('h-4 w-4', valueClass)} />
+                <Icon className={cn('h-[18px] w-[18px]', valueClass)} strokeWidth={2} />
               </div>
             ) : null}
           </div>

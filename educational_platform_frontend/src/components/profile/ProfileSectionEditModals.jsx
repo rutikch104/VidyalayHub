@@ -1,7 +1,35 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import userService from '@/services/userService';
+import SkillAutocomplete from '@/components/profile/SkillAutocomplete';
+import ExperienceDateFields from '@/components/profile/ExperienceDateFields';
+import EducationDateFields from '@/components/profile/EducationDateFields';
+import { SkillChip } from '@/components/profile/premium/ProfileSkillsGrid';
+import {
+  buildExperienceDatePayload,
+  emptyExperienceDateForm,
+  experienceRowToDateForm,
+  validateExperienceDates,
+} from '@/components/profile/experienceDates';
+import { ProfileExperienceEntry } from '@/components/profile/premium/ProfileExperienceTimeline';
+import { ProfileEducationEntry } from '@/components/profile/premium/ProfileEducationList';
+import {
+  buildEducationDatePayload,
+  emptyEducationDateForm,
+  educationRowToDateForm,
+  validateEducationDates,
+} from '@/components/profile/educationDates';
+import {
+  PROFILE_ABOUT_MAX_CHARS,
+  PROFILE_SKILLS_MAX,
+  clampAboutText,
+  formatAboutCharCount,
+  isAboutAtLimit,
+  isSkillsAtLimit,
+  formatSkillsCount,
+} from '@/components/profile/profileLimits';
 
 const inputClass =
   'w-full rounded-xl border border-border/80 bg-background/80 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-all duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
@@ -18,9 +46,16 @@ function FieldError({ message }) {
   );
 }
 
-function EntryActions({ onEdit, onDelete, loading }) {
+function EntryActions({ onEdit, onDelete, loading, alwaysVisible = false }) {
   return (
-    <div className="flex shrink-0 gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+    <div
+      className={cn(
+        'flex shrink-0 gap-1',
+        alwaysVisible
+          ? 'opacity-100'
+          : 'opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100',
+      )}
+    >
       <button
         type="button"
         onClick={onEdit}
@@ -141,12 +176,31 @@ export default function ProfileSectionEditModals({
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [aboutForm, setAboutForm] = useState({ bio: '', location: '', headline: '', website: '' });
-  const [expForm, setExpForm] = useState({ title: '', company: '', duration: '', description: '' });
+  const [aboutForm, setAboutForm] = useState({ bio: '' });
+  const [expForm, setExpForm] = useState({
+    title: '',
+    company: '',
+    description: '',
+    ...emptyExperienceDateForm(),
+  });
+  const [expDateErrors, setExpDateErrors] = useState({});
   const [editExpId, setEditExpId] = useState(null);
+  const [eduForm, setEduForm] = useState({
+    institution_name: '',
+    degree: '',
+    field_of_study: '',
+    cgpa: '',
+    percentage: '',
+    description: '',
+    achievements: '',
+    ...emptyEducationDateForm(),
+  });
+  const [eduDateErrors, setEduDateErrors] = useState({});
+  const [editEduId, setEditEduId] = useState(null);
   const [achForm, setAchForm] = useState({ title: '', description: '' });
   const [editAchId, setEditAchId] = useState(null);
   const [skillName, setSkillName] = useState('');
+  const [skillQuery, setSkillQuery] = useState('');
   const [skillLevel, setSkillLevel] = useState('');
   const [editSkillId, setEditSkillId] = useState(null);
   const [teachForm, setTeachForm] = useState({ subjectsText: '', experience_years: '', notes: '' });
@@ -162,15 +216,45 @@ export default function ProfileSectionEditModals({
   const [pubForm, setPubForm] = useState({ title: '', venue: '', year: '', description: '', url: '' });
   const [editPubId, setEditPubId] = useState(null);
 
+  // Reset all per-section edit state whenever the active section changes
+  // (including close → null). Without this, leaving an edit half-done in
+  // one section leaves the form/edit-ID populated when the section is
+  // reopened, showing "Update" with stale values instead of "Add".
   useEffect(() => {
     setErr('');
+    setEditExpId(null);
+    setExpForm({ title: '', company: '', description: '', ...emptyExperienceDateForm() });
+    setExpDateErrors({});
+    setEditEduId(null);
+    setEduForm({
+      institution_name: '',
+      degree: '',
+      field_of_study: '',
+      cgpa: '',
+      percentage: '',
+      description: '',
+      achievements: '',
+      ...emptyEducationDateForm(),
+    });
+    setEduDateErrors({});
+    setEditAchId(null);
+    setAchForm({ title: '', description: '' });
+    setEditSkillId(null);
+    setSkillName('');
+    setSkillQuery('');
+    setSkillLevel('');
+    setEditProjId(null);
+    setProjForm({ title: '', description: '', technologies: '', github_url: '', live_url: '', status: 'Completed' });
+    setEditPubId(null);
+    setPubForm({ title: '', venue: '', year: '', description: '', url: '' });
+  }, [section]);
+
+  // Hydrate forms for sections that present a single-form (not list+add) editor.
+  useEffect(() => {
     if (!profileData) return;
     if (section === 'about') {
       setAboutForm({
         bio: profileData.bio || '',
-        location: profileData.location || '',
-        headline: profileData.headline || '',
-        website: profileData.socialLinks?.website || '',
       });
     }
     if (section === 'teaching' && profileData.teachingInfo) {
@@ -184,14 +268,16 @@ export default function ProfileSectionEditModals({
   }, [section, profileData]);
 
   const saveAbout = async () => {
+    const bio = clampAboutText(aboutForm.bio).trim();
+    if (bio.length > PROFILE_ABOUT_MAX_CHARS) {
+      setErr(`About cannot exceed ${PROFILE_ABOUT_MAX_CHARS.toLocaleString()} characters.`);
+      return;
+    }
     setLoading(true);
     setErr('');
     try {
       await userService.updateProfileAbout({
-        bio: aboutForm.bio.trim(),
-        location: aboutForm.location.trim(),
-        headline: aboutForm.headline.trim(),
-        website: aboutForm.website.trim(),
+        bio,
       });
       await onSaved?.();
       onClose?.();
@@ -202,28 +288,40 @@ export default function ProfileSectionEditModals({
     }
   };
 
+  const resetExpForm = () => {
+    setExpForm({ title: '', company: '', description: '', ...emptyExperienceDateForm() });
+    setExpDateErrors({});
+  };
+
   const addExperience = async () => {
-    if (!expForm.title.trim()) { setErr('Title is required.'); return; }
+    if (!expForm.title.trim()) {
+      setErr('Title is required.');
+      return;
+    }
+    const dateValidation = validateExperienceDates(expForm);
+    if (!dateValidation.valid) {
+      setExpDateErrors(dateValidation.errors);
+      setErr(dateValidation.message);
+      return;
+    }
+    setExpDateErrors({});
     setLoading(true);
     setErr('');
     try {
+      const datePayload = buildExperienceDatePayload(expForm);
+      const payload = {
+        title: expForm.title.trim(),
+        company: expForm.company.trim(),
+        description: expForm.description.trim(),
+        ...datePayload,
+      };
       if (editExpId) {
-        await userService.updateProfileExperience(editExpId, {
-          title: expForm.title.trim(),
-          company: expForm.company.trim(),
-          duration: expForm.duration.trim(),
-          description: expForm.description.trim(),
-        });
+        await userService.updateProfileExperience(editExpId, payload);
         setEditExpId(null);
       } else {
-        await userService.addProfileExperience({
-          title: expForm.title.trim(),
-          company: expForm.company.trim(),
-          duration: expForm.duration.trim(),
-          description: expForm.description.trim(),
-        });
+        await userService.addProfileExperience(payload);
       }
-      setExpForm({ title: '', company: '', duration: '', description: '' });
+      resetExpForm();
       await onSaved?.();
     } catch (e) {
       setErr(e?.message || 'Save failed');
@@ -239,7 +337,7 @@ export default function ProfileSectionEditModals({
       await userService.deleteProfileExperience(id);
       if (editExpId === id) {
         setEditExpId(null);
-        setExpForm({ title: '', company: '', duration: '', description: '' });
+        resetExpForm();
       }
       await onSaved?.();
     } catch (e) {
@@ -249,13 +347,100 @@ export default function ProfileSectionEditModals({
     }
   };
 
+  const resetEduForm = () => {
+    setEduForm({
+      institution_name: '',
+      degree: '',
+      field_of_study: '',
+      cgpa: '',
+      percentage: '',
+      description: '',
+      achievements: '',
+      ...emptyEducationDateForm(),
+    });
+    setEduDateErrors({});
+  };
+
+  const addEducation = async () => {
+    if (!eduForm.institution_name.trim()) {
+      setErr('Institution name is required.');
+      return;
+    }
+    const dateValidation = validateEducationDates(eduForm);
+    if (!dateValidation.valid) {
+      setEduDateErrors(dateValidation.errors);
+      setErr(dateValidation.message);
+      return;
+    }
+    setEduDateErrors({});
+    setLoading(true);
+    setErr('');
+    try {
+      const payload = {
+        institution_name: eduForm.institution_name.trim(),
+        degree: eduForm.degree.trim(),
+        field_of_study: eduForm.field_of_study.trim(),
+        cgpa: eduForm.cgpa.trim(),
+        percentage: eduForm.percentage.trim(),
+        description: eduForm.description.trim(),
+        achievements: eduForm.achievements.trim(),
+        ...buildEducationDatePayload(eduForm),
+      };
+      if (editEduId) {
+        await userService.updateProfileEducation(editEduId, payload);
+        setEditEduId(null);
+      } else {
+        await userService.addProfileEducation(payload);
+      }
+      resetEduForm();
+      await onSaved?.();
+    } catch (e) {
+      setErr(e?.message || 'Save failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const delEdu = async (id) => {
+    setLoading(true);
+    setErr('');
+    try {
+      await userService.deleteProfileEducation(id);
+      if (editEduId === id) {
+        setEditEduId(null);
+        resetEduForm();
+      }
+      await onSaved?.();
+    } catch (e) {
+      setErr(e?.message || 'Delete failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditEdu = (row) => {
+    setEditEduId(row.id);
+    setEduDateErrors({});
+    setEduForm({
+      institution_name: row.institution_name || row.school || '',
+      degree: row.degree || '',
+      field_of_study: row.field_of_study || '',
+      cgpa: row.cgpa || '',
+      percentage: row.percentage || '',
+      description: row.description || '',
+      achievements: row.achievements || '',
+      ...educationRowToDateForm(row),
+    });
+  };
+
   const startEditExp = (row) => {
     setEditExpId(row.id);
+    setExpDateErrors({});
     setExpForm({
       title: row.title || '',
       company: row.company || '',
-      duration: row.duration || '',
       description: row.description || '',
+      ...experienceRowToDateForm(row),
     });
   };
 
@@ -311,25 +496,54 @@ export default function ProfileSectionEditModals({
     setAchForm({ title, description });
   };
 
-  const addSkill = async () => {
-    if (!skillName.trim()) { setErr('Skill name is required.'); return; }
+  const addSkill = async (pick) => {
+    const skillRowsNow = profileData?.professionalInfo?.skillsDetailed || [];
+
+    if (editSkillId) {
+      if (!skillName.trim()) {
+        setErr('Skill name is required.');
+        return;
+      }
+      setLoading(true);
+      setErr('');
+      try {
+        const lvl = skillLevel.trim() === '' ? undefined : parseInt(skillLevel, 10);
+        if (lvl != null && (Number.isNaN(lvl) || lvl < 0 || lvl > 10)) {
+          setErr('Rating must be between 0 and 10.');
+          setLoading(false);
+          return;
+        }
+        await userService.updateProfileSkill(editSkillId, { skill_name: skillName.trim(), level: lvl });
+        setEditSkillId(null);
+        setSkillName('');
+        setSkillLevel('');
+        await onSaved?.();
+      } catch (e) {
+        setErr(e?.message || 'Save failed');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    const payload = pick || { skill_name: skillQuery.trim() };
+    if (!payload.skill_name?.trim() && !payload.skill_id) {
+      setErr('Select a skill from suggestions or create a new one.');
+      return;
+    }
+    if (skillRowsNow.length >= PROFILE_SKILLS_MAX) {
+      setErr('Maximum 10 skills allowed.');
+      return;
+    }
+
     setLoading(true);
     setErr('');
     try {
-      const lvl = skillLevel.trim() === '' ? undefined : parseInt(skillLevel, 10);
-      if (lvl != null && (Number.isNaN(lvl) || lvl < 0 || lvl > 10)) {
-        setErr('Rating must be between 0 and 10.');
-        setLoading(false);
-        return;
-      }
-      if (editSkillId) {
-        await userService.updateProfileSkill(editSkillId, { skill_name: skillName.trim(), level: lvl });
-        setEditSkillId(null);
-      } else {
-        await userService.addProfileSkill({ skill_name: skillName.trim(), level: lvl });
-      }
-      setSkillName('');
-      setSkillLevel('');
+      await userService.addProfileSkill({
+        skill_id: payload.skill_id,
+        skill_name: payload.skill_name?.trim(),
+      });
+      setSkillQuery('');
       await onSaved?.();
     } catch (e) {
       setErr(e?.message || 'Save failed');
@@ -503,11 +717,15 @@ export default function ProfileSectionEditModals({
   if (section !== 'projects' && section !== 'publications' && !profileData) return null;
 
   const list = profileData?.professionalInfo?.experienceList || [];
+  const eduList = profileData?.educationList || [];
   const achList = profileData?.achievements || [];
   const skillRows = profileData?.professionalInfo?.skillsDetailed || [];
 
   /* ── About ── */
   if (section === 'about') {
+    const aboutLen = aboutForm.bio.length;
+    const aboutAtLimit = isAboutAtLimit(aboutLen);
+
     return (
       <ModalShell
         title="Edit about"
@@ -523,44 +741,170 @@ export default function ProfileSectionEditModals({
         <FieldError message={err} />
         <div className="space-y-4">
           <div>
-            <label className={labelClass}>Headline</label>
-            <input
-              className={inputClass}
-              value={aboutForm.headline}
-              onChange={(e) => setAboutForm({ ...aboutForm, headline: e.target.value })}
-              placeholder="e.g. Final-year CSE · ML enthusiast"
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Bio</label>
+            <label className={labelClass} htmlFor="profile-about-bio">
+              About
+            </label>
+            <p className="mb-2 text-xs leading-relaxed text-muted-foreground">
+              Write a clear introduction about who you are, what you do, and what you care about.
+            </p>
             <textarea
-              className={`${inputClass} min-h-[100px] resize-none`}
+              id="profile-about-bio"
+              className={cn(
+                inputClass,
+                'min-h-[160px] resize-y leading-relaxed',
+                aboutAtLimit && 'border-destructive/50 focus:border-destructive focus:ring-destructive/20',
+              )}
               value={aboutForm.bio}
-              onChange={(e) => setAboutForm({ ...aboutForm, bio: e.target.value })}
-              placeholder="Tell others about your goals and interests…"
+              maxLength={PROFILE_ABOUT_MAX_CHARS}
+              onChange={(e) => setAboutForm({ bio: clampAboutText(e.target.value) })}
+              placeholder="e.g. Passionate about building scalable solutions and turning ideas into reality…"
+              rows={6}
+              aria-describedby="profile-about-counter"
             />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className={labelClass}>Location</label>
-              <input
-                className={inputClass}
-                value={aboutForm.location}
-                onChange={(e) => setAboutForm({ ...aboutForm, location: e.target.value })}
-                placeholder="City, Country"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Website</label>
-              <input
-                className={inputClass}
-                value={aboutForm.website}
-                onChange={(e) => setAboutForm({ ...aboutForm, website: e.target.value })}
-                placeholder="https://…"
-              />
+            <div id="profile-about-counter" className="premium-profile-about-counter" aria-live="polite">
+              <span
+                className={cn(
+                  'premium-profile-about-counter__text',
+                  aboutAtLimit && 'premium-profile-about-counter__text--limit',
+                )}
+              >
+                {formatAboutCharCount(aboutLen)}
+              </span>
+              {aboutAtLimit ? (
+                <span className="premium-profile-about-counter__message">
+                  Maximum {PROFILE_ABOUT_MAX_CHARS.toLocaleString()} characters reached.
+                </span>
+              ) : null}
             </div>
           </div>
+          <p className="rounded-xl border border-border/50 bg-muted/25 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            Manage your skills from the <span className="font-semibold text-foreground">Skills</span> section on your profile.
+          </p>
         </div>
+      </ModalShell>
+    );
+  }
+
+  /* ── Education ── */
+  if (section === 'education') {
+    return (
+      <ModalShell title="Education" onClose={onClose}>
+        <FieldError message={err} />
+        {eduList.length > 0 ? (
+          <div className="premium-profile-education-list premium-profile-education-list--modal mb-5">
+            {eduList.map((row) => (
+              <ProfileEducationEntry
+                key={row.id}
+                edu={row}
+                compactDescription
+                className="premium-profile-education-card--modal"
+                actions={(
+                  <EntryActions
+                    alwaysVisible
+                    onEdit={() => startEditEdu(row)}
+                    onDelete={() => void delEdu(row.id)}
+                    loading={loading}
+                  />
+                )}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="mb-4 text-sm text-muted-foreground">No education entries yet. Add your first below.</p>
+        )}
+
+        <AddPanel label={editEduId ? 'Update education' : 'Add education'}>
+          <div className="space-y-3">
+            <div>
+              <label className={labelClass}>School / Institution *</label>
+              <input
+                className={inputClass}
+                placeholder="e.g. R. C. Patel Institute of Technology"
+                value={eduForm.institution_name}
+                onChange={(e) => setEduForm({ ...eduForm, institution_name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Degree</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Bachelor of Technology"
+                  value={eduForm.degree}
+                  onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Field of study</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Computer Engineering"
+                  value={eduForm.field_of_study}
+                  onChange={(e) => setEduForm({ ...eduForm, field_of_study: e.target.value })}
+                />
+              </div>
+            </div>
+            <EducationDateFields
+              value={eduForm}
+              onChange={(dates) => {
+                setEduForm((prev) => ({ ...prev, ...dates }));
+                setEduDateErrors({});
+              }}
+              disabled={loading}
+              errors={eduDateErrors}
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>CGPA</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. 8.5"
+                  value={eduForm.cgpa}
+                  onChange={(e) => setEduForm({ ...eduForm, cgpa: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Percentage</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. 80.77%"
+                  value={eduForm.percentage}
+                  onChange={(e) => setEduForm({ ...eduForm, percentage: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Description</label>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={3}
+                placeholder="Activities, societies, coursework highlights…"
+                value={eduForm.description}
+                onChange={(e) => setEduForm({ ...eduForm, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Academic achievements (optional)</label>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={2}
+                placeholder="Honors, awards, dean's list…"
+                value={eduForm.achievements}
+                onChange={(e) => setEduForm({ ...eduForm, achievements: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            {editEduId ? (
+              <button type="button" className="app-btn-secondary text-sm" onClick={() => { setEditEduId(null); resetEduForm(); }}>
+                Cancel
+              </button>
+            ) : null}
+            <button type="button" className="app-btn-primary text-sm" disabled={loading} onClick={() => void addEducation()}>
+              {loading ? 'Saving…' : editEduId ? 'Update' : 'Add education'}
+            </button>
+          </div>
+        </AddPanel>
       </ModalShell>
     );
   }
@@ -571,27 +915,22 @@ export default function ProfileSectionEditModals({
       <ModalShell title="Experience" onClose={onClose}>
         <FieldError message={err} />
         {list.length > 0 ? (
-          <div className="mb-5 space-y-2">
+          <div className="premium-profile-experience-list premium-profile-experience-list--modal mb-5">
             {list.map((row) => (
-              <div
+              <ProfileExperienceEntry
                 key={row.id}
-                className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-muted/30 p-4 transition-colors hover:border-border/80 hover:bg-muted/50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">{row.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {[row.company, row.duration].filter(Boolean).join(' · ') || '—'}
-                  </p>
-                  {row.description ? (
-                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-foreground/70">{row.description}</p>
-                  ) : null}
-                </div>
-                <EntryActions
-                  onEdit={() => startEditExp(row)}
-                  onDelete={() => void delExp(row.id)}
-                  loading={loading}
-                />
-              </div>
+                ex={row}
+                compactDescription
+                className="premium-profile-experience-card--modal"
+                actions={(
+                  <EntryActions
+                    alwaysVisible
+                    onEdit={() => startEditExp(row)}
+                    onDelete={() => void delExp(row.id)}
+                    loading={loading}
+                  />
+                )}
+              />
             ))}
           </div>
         ) : (
@@ -610,10 +949,15 @@ export default function ProfileSectionEditModals({
                 <input className={inputClass} placeholder="e.g. Google" value={expForm.company} onChange={(e) => setExpForm({ ...expForm, company: e.target.value })} />
               </div>
             </div>
-            <div>
-              <label className={labelClass}>Duration</label>
-              <input className={inputClass} placeholder="e.g. Jun 2023 – Present" value={expForm.duration} onChange={(e) => setExpForm({ ...expForm, duration: e.target.value })} />
-            </div>
+            <ExperienceDateFields
+              value={expForm}
+              onChange={(dates) => {
+                setExpForm((prev) => ({ ...prev, ...dates }));
+                setExpDateErrors({});
+              }}
+              disabled={loading}
+              errors={expDateErrors}
+            />
             <div>
               <label className={labelClass}>Description</label>
               <textarea className={`${inputClass} resize-none`} rows={3} placeholder="Key responsibilities and achievements…" value={expForm.description} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} />
@@ -621,7 +965,7 @@ export default function ProfileSectionEditModals({
           </div>
           <div className="mt-4 flex justify-end gap-2">
             {editExpId ? (
-              <button type="button" className="app-btn-secondary text-sm" onClick={() => { setEditExpId(null); setExpForm({ title: '', company: '', duration: '', description: '' }); }}>
+              <button type="button" className="app-btn-secondary text-sm" onClick={() => { setEditExpId(null); resetExpForm(); }}>
                 Cancel
               </button>
             ) : null}
@@ -697,75 +1041,145 @@ export default function ProfileSectionEditModals({
 
   /* ── Skills ── */
   if (section === 'skills') {
+    const legacySkills = (profileData?.professionalInfo?.skills || []).filter(
+      (name) => !skillRows.some((r) => String(r.name).toLowerCase() === String(name).toLowerCase()),
+    );
+    const skillCount = skillRows.length;
+    const skillsAtLimit = isSkillsAtLimit(skillCount);
+    const canAddSkill = Boolean(editSkillId) || !skillsAtLimit;
+
     return (
-      <ModalShell title="Skills" onClose={onClose}>
+      <ModalShell
+        title="Edit skills"
+        onClose={onClose}
+        footer={
+          <div className="flex justify-end">
+            <button type="button" className="app-btn-secondary" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        }
+      >
         <FieldError message={err} />
-        {skillRows.length === 0 && (profileData?.professionalInfo?.skills || []).length === 0 ? (
-          <p className="mb-4 text-sm text-muted-foreground">No skills saved yet.</p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Add professional skills — shown as tags on your profile.
+          </p>
+          <span
+            className={cn(
+              'text-xs font-semibold tabular-nums',
+              skillsAtLimit ? 'text-destructive' : 'text-muted-foreground',
+            )}
+          >
+            {formatSkillsCount(skillCount)}
+          </span>
+        </div>
+
+        {skillsAtLimit && !editSkillId ? (
+          <p className="mb-4 rounded-xl border border-amber-200/60 bg-amber-50/80 px-3.5 py-2.5 text-xs font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            Maximum {PROFILE_SKILLS_MAX} skills allowed. Remove a skill to add another.
+          </p>
         ) : null}
-        {skillRows.length > 0 ? (
-          <div className="mb-5 flex flex-wrap gap-2">
+
+        {skillRows.length > 0 || legacySkills.length > 0 ? (
+          <div className="premium-profile-skills-grid mb-5">
             {skillRows.map((s) => (
               <span
                 key={s.id}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-foreground"
+                className="premium-profile-skill-chip premium-profile-skill-chip--editable group"
               >
-                {s.name}
-                {s.level != null && s.level !== '' ? (
-                  <span className="text-muted-foreground">· {s.level}/10</span>
-                ) : null}
-                <span className="ml-0.5 flex gap-0.5">
+                <span className="premium-profile-skill-chip__label">{s.name}</span>
+                <span className="premium-profile-skill-chip__actions">
                   <button
                     type="button"
                     disabled={loading}
+                    aria-label={`Edit ${s.name}`}
                     onClick={() => startEditSkill(s)}
-                    className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                    className="premium-profile-skill-chip__action"
                   >
-                    <Pencil className="h-2.5 w-2.5" />
+                    <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
                     disabled={loading}
+                    aria-label={`Remove ${s.name}`}
                     onClick={() => void delSkill(s.id)}
-                    className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-destructive"
+                    className="premium-profile-skill-chip__action premium-profile-skill-chip__action--danger"
                   >
-                    <X className="h-2.5 w-2.5" />
+                    <X className="h-3 w-3" />
                   </button>
                 </span>
               </span>
             ))}
+            {legacySkills.map((name) => (
+              <SkillChip key={name} name={name} className="opacity-60" />
+            ))}
           </div>
-        ) : null}
-        {skillRows.length === 0
-          ? (profileData?.professionalInfo?.skills || []).map((name) => (
-              <span key={name} className="mb-4 inline-block rounded-full border border-dashed border-border px-3 py-1 text-xs text-muted-foreground">
-                {name} (legacy — add again to manage)
-              </span>
-            ))
-          : null}
+        ) : (
+          <p className="mb-4 text-sm text-muted-foreground">No skills yet. Add your first skill below.</p>
+        )}
 
-        <AddPanel label={editSkillId ? 'Update skill' : 'Add skill'}>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex-1">
-              <label className={labelClass}>Skill name</label>
-              <input className={inputClass} placeholder="e.g. React, Python…" value={skillName} onChange={(e) => setSkillName(e.target.value)} />
-            </div>
-            <div className="w-full sm:w-36">
-              <label className={labelClass}>Rating 0–10</label>
-              <input className={inputClass} type="number" min="0" max="10" placeholder="Optional" value={skillLevel} onChange={(e) => setSkillLevel(e.target.value)} />
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
+        {canAddSkill ? (
+          <AddPanel label={editSkillId ? 'Update skill' : 'Add skill'}>
             {editSkillId ? (
-              <button type="button" className="app-btn-secondary text-sm" onClick={() => { setEditSkillId(null); setSkillName(''); setSkillLevel(''); }}>
-                Cancel
-              </button>
-            ) : null}
-            <button type="button" className="app-btn-primary text-sm" disabled={loading} onClick={() => void addSkill()}>
-              {loading ? 'Saving…' : editSkillId ? 'Update' : 'Add skill'}
-            </button>
-          </div>
-        </AddPanel>
+              <>
+                <div>
+                  <label className={labelClass}>Skill name</label>
+                  <input
+                    className={inputClass}
+                    value={skillName}
+                    onChange={(e) => setSkillName(e.target.value)}
+                  />
+                </div>
+                <details className="mt-3 text-xs text-muted-foreground">
+                  <summary className="cursor-pointer font-medium text-foreground/80">Optional proficiency (0–10)</summary>
+                  <div className="mt-2 w-full max-w-[8rem]">
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      max="10"
+                      placeholder="—"
+                      value={skillLevel}
+                      onChange={(e) => setSkillLevel(e.target.value)}
+                    />
+                  </div>
+                </details>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="app-btn-secondary text-sm"
+                    onClick={() => {
+                      setEditSkillId(null);
+                      setSkillName('');
+                      setSkillLevel('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="app-btn-primary text-sm"
+                    disabled={loading}
+                    onClick={() => void addSkill()}
+                  >
+                    {loading ? 'Saving…' : 'Update skill'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <SkillAutocomplete
+                value={skillQuery}
+                onChange={setSkillQuery}
+                onSelect={(pick) => void addSkill(pick)}
+                disabled={loading}
+                existingSkillNames={skillRows.map((s) => s.name)}
+                inputClassName={inputClass}
+                placeholder="Search or create a skill (e.g. React, Node.js)…"
+              />
+            )}
+          </AddPanel>
+        ) : null}
       </ModalShell>
     );
   }
@@ -921,6 +1335,9 @@ export default function ProfileSectionEditModals({
 
   /* ── Teaching ── */
   if (section === 'teaching') {
+    // Teaching info applies to teachers only. Refuse to open for any other
+    // role even if a stale callsite still requests this section.
+    if (profileData?.userType !== 'teacher') return null;
     return (
       <ModalShell
         title="Teaching information"

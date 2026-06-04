@@ -4,16 +4,21 @@ const { authenticate } = require('../middleware/auth');
 const { upload } = require('../middleware/uploadMiddleware');
 const userApiController = require('../controllers/userApiController');
 const profileSectionsController = require('../controllers/profileSectionsController');
+const skillsController = require('../controllers/skillsController');
 const userController = require('../controllers/userController');
 
 router.use(authenticate);
 
 router.get('/me', userApiController.getMe);
 router.get('/me/sidebar-summary', userApiController.getMeSidebarSummary);
+router.get('/skills/suggest', skillsController.suggestSkills);
 router.put('/profile/about', profileSectionsController.putProfileAbout);
 router.post('/profile/experience', profileSectionsController.postProfileExperience);
 router.put('/profile/experience/:id', profileSectionsController.putProfileExperience);
 router.delete('/profile/experience/:id', profileSectionsController.deleteProfileExperience);
+router.post('/profile/education', profileSectionsController.postProfileEducation);
+router.put('/profile/education/:id', profileSectionsController.putProfileEducation);
+router.delete('/profile/education/:id', profileSectionsController.deleteProfileEducation);
 router.post('/profile/achievements', profileSectionsController.postProfileAchievement);
 router.put('/profile/achievements/:id', profileSectionsController.putProfileAchievement);
 router.delete('/profile/achievements/:id', profileSectionsController.deleteProfileAchievement);

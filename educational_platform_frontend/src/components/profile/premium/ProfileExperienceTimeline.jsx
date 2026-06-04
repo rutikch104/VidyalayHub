@@ -1,30 +1,85 @@
+import { Briefcase } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { formatExperienceDuration } from '@/components/profile/experienceDates';
+
+/**
+ * Single experience entry — premium card (profile view + edit modal).
+ */
+export function ProfileExperienceEntry({
+  ex,
+  className,
+  actions,
+  compactDescription = false,
+  ...rest
+}) {
+  const duration = formatExperienceDuration(ex);
+
+  return (
+    <article
+      className={cn(
+        'premium-profile-experience-card',
+        actions && 'group premium-profile-experience-card--has-actions',
+        className,
+      )}
+      aria-label={[ex.title, ex.company].filter(Boolean).join(' at ')}
+      {...rest}
+    >
+      <div className="premium-profile-experience-card__body">
+        <div className="premium-profile-experience-card__icon" aria-hidden>
+          <Briefcase className="h-4 w-4" strokeWidth={1.85} />
+        </div>
+        <div className="premium-profile-experience-card__content">
+          <div className="premium-profile-experience-card__header">
+            <div className="premium-profile-experience-card__titles">
+              <h3 className="premium-profile-experience-card__title">{ex.title}</h3>
+              {ex.company ? (
+                <p className="premium-profile-experience-card__company">{ex.company}</p>
+              ) : null}
+            </div>
+            {duration ? (
+              <p className="premium-profile-experience-card__dates">{duration}</p>
+            ) : null}
+          </div>
+          {ex.description ? (
+            <p
+              className={cn(
+                'premium-profile-experience-card__description',
+                compactDescription && 'premium-profile-experience-card__description--clamp',
+              )}
+            >
+              {ex.description}
+            </p>
+          ) : null}
+          {ex.location ? (
+            <p className="premium-profile-experience-card__location">{ex.location}</p>
+          ) : null}
+        </div>
+        {actions ? (
+          <div className="premium-profile-experience-card__actions">{actions}</div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 export default function ProfileExperienceTimeline({ items = [] }) {
   if (!items.length) {
-    return <p className="text-sm leading-relaxed text-foreground/80">No experience listed yet.</p>;
+    return (
+      <p className="premium-profile-experience-list__empty">
+        No experience listed yet.
+      </p>
+    );
   }
 
   return (
-    <ol className="relative space-y-6 border-l-2 border-border/30 pl-6">
+    <div className="premium-profile-experience-list" role="list">
       {items.map((ex) => (
-        <li key={ex.id || `${ex.title}-${ex.company}`} className="group relative">
-          <span
-            className="absolute -left-[1.1875rem] top-1 h-4 w-4 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 shadow-sm ring-2 ring-background"
-            aria-hidden
-          />
-          <p className="text-sm font-semibold leading-snug text-foreground">{ex.title}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {ex.company || '—'}
-          </p>
-          {(ex.duration || ex.location) ? (
-            <p className="mt-0.5 text-xs text-muted-foreground/70">
-              {[ex.duration, ex.location].filter(Boolean).join(' · ')}
-            </p>
-          ) : null}
-          {ex.description ? (
-            <p className="mt-1.5 text-sm leading-relaxed text-foreground/70">{ex.description}</p>
-          ) : null}
-        </li>
+        <ProfileExperienceEntry
+          key={ex.id || `${ex.title}-${ex.company}`}
+          ex={ex}
+          role="listitem"
+        />
       ))}
-    </ol>
+    </div>
   );
 }

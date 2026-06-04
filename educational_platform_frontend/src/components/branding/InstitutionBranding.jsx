@@ -15,6 +15,7 @@ export default function InstitutionBranding({
   onNavigate,
   className,
   compact = false,
+  variant = 'default',
 }) {
   const { user, updateUser } = useAuth();
   const [logoFailed, setLogoFailed] = useState(false);
@@ -64,6 +65,7 @@ export default function InstitutionBranding({
       className={cn(
         'institution-brand group flex min-w-0 shrink items-center gap-2.5 rounded-xl border border-transparent px-1 py-0.5 transition-all duration-200',
         'hover:border-border/60 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+        variant === 'header' && 'institution-brand--header',
         className,
       )}
       aria-label={`${branding.name} — go to home`}
@@ -108,7 +110,7 @@ export default function InstitutionBranding({
         >
           {branding.name}
         </p>
-        {!compact && !branding.isPlatformFallback ? (
+        {!compact && !branding.isPlatformFallback && variant !== 'header' ? (
           <p className="institution-brand__meta flex items-center gap-1 truncate text-[10px] font-medium uppercase tracking-widest text-muted-foreground/75">
             <Building2 className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
             <span className="truncate">Institution portal</span>

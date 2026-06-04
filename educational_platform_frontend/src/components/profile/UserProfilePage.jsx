@@ -75,8 +75,39 @@ export default function UserProfilePage({ userId, onBack, onNavigate }) {
         userService.getUserProjects(userId).catch(() => ({ projects: [] })),
         userService.getUserPublications(userId).catch(() => ({ publications: [] })),
       ]);
-      setUserProjects(projectsRes?.projects || projectsRes || []);
-      setUserPublications(pubsRes?.publications || pubsRes || []);
+      const rawProjects = Array.isArray(projectsRes?.projects)
+        ? projectsRes.projects
+        : Array.isArray(projectsRes)
+          ? projectsRes
+          : [];
+      // Normalise to the camelCase shape ProjectsSection expects (parity with Profile.jsx self-view)
+      setUserProjects(
+        rawProjects.map((project) => ({
+          id: project.id,
+          title: project.title,
+          description: project.description,
+          technologies: project.technologies || [],
+          status: project.status || 'Completed',
+          image: project.image_url,
+          githubUrl: project.github_url,
+          liveUrl: project.live_url,
+        })),
+      );
+      const rawPubs = Array.isArray(pubsRes?.publications)
+        ? pubsRes.publications
+        : Array.isArray(pubsRes)
+          ? pubsRes
+          : [];
+      setUserPublications(
+        rawPubs.map((p) => ({
+          id: p.id,
+          title: p.title,
+          venue: p.venue || '',
+          year: p.year || '',
+          description: p.description || '',
+          url: p.url || '',
+        })),
+      );
     } catch {
       setUserProjects([]);
       setUserPublications([]);

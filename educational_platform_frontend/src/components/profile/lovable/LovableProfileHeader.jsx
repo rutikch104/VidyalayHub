@@ -15,7 +15,9 @@ import {
   MoreHorizontal,
   Check,
   Link2,
-  Briefcase,
+  Phone,
+  Mail,
+  Link,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { resolveMediaUrl } from '@/services/postService';
@@ -128,9 +130,30 @@ export default function LovableProfileHeader({
   const websiteUrl = profileData?.website || profileData?.socialLinks?.website;
   const website = displayWebsite(websiteUrl);
 
+  const contactPhone = profileData?.phone || profileData?.phone_number;
+  const contactEmail = profileData?.email;
+  const showPhoneOnCard = !!profileData?.show_phone && !!contactPhone;
+  const showEmailOnCard = !!profileData?.show_email && !!contactEmail;
+
   const metaItems = [
     handle ? { key: 'handle', icon: AtSign, text: handle } : null,
     profileData?.location ? { key: 'location', icon: MapPin, text: profileData.location } : null,
+    showPhoneOnCard
+      ? {
+          key: 'phone',
+          icon: Phone,
+          text: contactPhone,
+          href: `tel:${String(contactPhone).replace(/\s/g, '')}`,
+        }
+      : null,
+    showEmailOnCard
+      ? {
+          key: 'email',
+          icon: Mail,
+          text: contactEmail,
+          href: `mailto:${contactEmail}`,
+        }
+      : null,
     website ? { key: 'website', icon: Link2, text: website, href: websiteUrl } : null,
     profileData?.joinedAt
       ? {
@@ -143,11 +166,6 @@ export default function LovableProfileHeader({
         }
       : null,
   ].filter(Boolean);
-
-  const openToOpps =
-    !visitorMode &&
-    (profileData?.userType === 'alumni' || profileData?.userType === 'teacher') &&
-    !profileData?.professionalInfo?.company;
 
   return (
     <motion.section
@@ -348,20 +366,28 @@ export default function LovableProfileHeader({
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={() => void onShareProfile?.()}>
+                <DropdownMenuContent
+                  align="end"
+                  className="premium-profile-header__menu w-52 rounded-xl border-border/60 p-1.5 shadow-lg"
+                >
+                  <DropdownMenuItem
+                    onClick={() => void onShareProfile?.()}
+                    className="premium-profile-header__menu-item gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium"
+                  >
+                    <Link className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
                     Copy profile link
                   </DropdownMenuItem>
-                  {visitorMode && (
+                  {visitorMode ? (
                     <>
-                      <DropdownMenuItem className="text-destructive focus:text-destructive">
+                      <div className="my-1 h-px bg-border/50" role="separator" />
+                      <DropdownMenuItem className="premium-profile-header__menu-item premium-profile-header__menu-item--danger gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium">
                         Report profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive focus:text-destructive">
+                      <DropdownMenuItem className="premium-profile-header__menu-item premium-profile-header__menu-item--danger gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium">
                         Block user
                       </DropdownMenuItem>
                     </>
-                  )}
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -380,14 +406,6 @@ export default function LovableProfileHeader({
               )}
               <span className="premium-profile-header__role-pill">{roleBadge}</span>
             </div>
-
-            {/* Open to opportunities */}
-            {openToOpps && (
-              <div className="premium-profile-header__opp-badge mt-2">
-                <Briefcase className="h-3 w-3 shrink-0" aria-hidden />
-                Open to opportunities
-              </div>
-            )}
 
             {/* Headline */}
             <p className="premium-profile-header__headline mt-1.5">{headline}</p>

@@ -106,7 +106,7 @@ export default function SuperAdminCreateCollegeAdminModal({ open, onClose, initi
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      className="sa-modal-overlay"
       onClick={() => onClose?.()}
       role="presentation"
     >
@@ -114,25 +114,25 @@ export default function SuperAdminCreateCollegeAdminModal({ open, onClose, initi
         role="dialog"
         aria-modal="true"
         aria-labelledby="super-admin-portal-admin-title"
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl"
+        className="sa-modal sa-modal--wide"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <h2 id="super-admin-portal-admin-title" className="mb-1 text-lg font-bold text-foreground">
+        <h2 id="super-admin-portal-admin-title" className="sa-modal__title">
           Create college admin
         </h2>
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="sa-modal__desc mb-4">
           Creates login credentials for the main app. They use the regular sign-in page, then open Admin to approve
           students and manage that college.
         </p>
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-          <div>
-            <label className="text-sm text-muted-foreground">College *</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">College *</label>
             {loadingColleges ? (
-              <p className="mt-2 text-sm text-muted-foreground">Loading colleges…</p>
+              <p className="text-sm text-muted-foreground">Loading colleges…</p>
             ) : (
               <select
                 required
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+                className="sa-modal__select"
                 value={collegeId}
                 onChange={(ev) => setCollegeId(ev.target.value)}
               >
@@ -148,63 +148,63 @@ export default function SuperAdminCreateCollegeAdminModal({ open, onClose, initi
               </select>
             )}
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Email *</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Email *</label>
             <input
               type="email"
               required
               autoComplete="off"
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
             />
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Password *</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Password *</label>
             <input
               type="password"
               required
               minLength={6}
               autoComplete="new-password"
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-sm text-muted-foreground">First name</label>
+            <div className="sa-modal__field">
+              <label className="sa-modal__label">First name</label>
               <input
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+                className="sa-modal__input"
                 value={firstName}
                 onChange={(ev) => setFirstName(ev.target.value)}
               />
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground">Last name</label>
+            <div className="sa-modal__field">
+              <label className="sa-modal__label">Last name</label>
               <input
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+                className="sa-modal__input"
                 value={lastName}
                 onChange={(ev) => setLastName(ev.target.value)}
               />
             </div>
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Phone (optional)</label>
+          <div className="sa-modal__field">
+            <label className="sa-modal__label">Phone (optional)</label>
             <input
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2"
+              className="sa-modal__input"
               value={phone}
               onChange={(ev) => setPhone(ev.target.value)}
             />
           </div>
-          <div className="flex gap-2 pt-2">
-            <button type="button" onClick={() => onClose?.()} className="flex-1 rounded-xl border border-border py-2">
+          <div className="sa-modal__actions">
+            <button type="button" onClick={() => onClose?.()} className="sa-portal__btn">
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || loadingColleges || collegeOptions.length === 0 || !collegeId}
-              className="flex-1 rounded-xl bg-primary py-2 font-medium text-primary-foreground disabled:opacity-50"
+              className="sa-portal__btn sa-portal__btn--primary"
             >
               {saving ? 'Creating…' : 'Create admin'}
             </button>
