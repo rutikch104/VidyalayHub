@@ -1,0 +1,39 @@
+Testing Plan for Tenant Routes (tenantRoutes.js)
+
+1. POST /api/tenants/createtenants
+   - Purpose: Register a new college (tenant).
+   - Controller: tenantController.createTenant
+   - Test Cases:
+     - Valid registration data.
+     - Missing or invalid fields (e.g., missing name, email).
+
+2. GET /api/tenants/gettenants/:id
+   - Purpose: Retrieve details of a specific college by its ID.
+   - Controller: tenantController.getTenantById
+   - Test Cases:
+     - Valid college ID.
+     - Invalid or non-existent college ID.
+
+3. GET /api/tenants/getpendingtenants
+   - Purpose: List all colleges pending approval (requires admin verification).
+   - Middleware: verifyAdmin
+   - Controller: tenantController.getPendingTenants
+   - Test Cases:
+     - Admin authentication (verifyAdmin middleware).
+     - No pending colleges in the database.
+
+4. PUT /api/tenants/vhadmin/:id/status
+   - Purpose: Approve or reject a college (only for VH Admin).
+   - Middleware: verifyAdmin
+   - Controller: tenantController.updateTenantStatus
+   - Test Cases:
+     - Valid college ID and status update.
+     - Invalid college ID.
+     - Non-admin user attempting the action.
+
+5. POST /api/tenants/tenant-admins
+   - Purpose: Create tenant admins for a college.
+   - Controller: tenantController.createTenantAdmin
+   - Test Cases:
+     - Valid admin creation data.
+     - Missing or invalid fields.

@@ -1,0 +1,133 @@
+/**
+ * Premium comment thread — LinkedIn / Threads inspired
+ */
+
+  .comment-section {
+    @apply mt-4 border-t border-border pt-4;
+  }
+
+  .comment-section-header {
+    @apply mb-4 flex flex-wrap items-center justify-between gap-2;
+  }
+
+  .comment-sort-tabs {
+    @apply inline-flex rounded-full border border-border bg-muted/40 p-0.5;
+  }
+
+  .comment-sort-tab {
+    @apply rounded-full px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all duration-200;
+  }
+
+  .comment-sort-tab[aria-selected='true'] {
+    @apply bg-card text-foreground shadow-sm;
+  }
+
+  .comment-composer {
+    @apply flex gap-3 pb-4;
+  }
+
+  .comment-composer-input-wrap {
+    @apply relative flex-1 rounded-2xl border border-border bg-muted/30 transition-all duration-200 focus-within:border-primary/40 focus-within:bg-card focus-within:ring-2 focus-within:ring-primary/15;
+  }
+
+  .comment-composer-textarea {
+    @apply block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0;
+    min-height: 2.75rem;
+    max-height: 9rem;
+  }
+
+  .comment-composer-actions {
+    @apply mt-2 flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2;
+  }
+
+  .comment-thread {
+    @apply space-y-0;
+  }
+
+  .comment-item {
+    @apply relative py-3 transition-colors duration-150;
+  }
+
+  .comment-item + .comment-item {
+    @apply border-t border-border/70;
+  }
+
+  .comment-item-nested {
+    @apply border-t-0 py-2.5 pl-0;
+  }
+
+  .comment-item-body {
+    @apply flex gap-3;
+  }
+
+  .comment-avatar-slot {
+    @apply shrink-0 self-start;
+  }
+
+  .comment-avatar-slot-sm {
+    @apply shrink-0 self-start;
+  }
+
+  .comment-bubble {
+    @apply min-w-0 flex-1;
+  }
+
+  .comment-meta {
+    @apply mb-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5;
+  }
+
+  .comment-author {
+    @apply text-sm font-semibold text-foreground transition-colors hover:text-primary;
+  }
+
+  .comment-time {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .comment-edited {
+    @apply text-xs text-muted-foreground;
+  }
+
+  .comment-text {
+    @apply text-sm text-foreground/95 leading-relaxed;
+  }
+
+  .comment-actions-row {
+    @apply mt-1.5 flex flex-wrap items-center gap-1;
+  }
+
+  .comment-action {
+    @apply rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
+  }
+
+  .comment-action-active {
+    @apply text-primary;
+  }
+
+  .comment-action-danger {
+    @apply text-destructive hover:bg-destructive/10 hover:text-destructive;
+  }
+
+  .comment-replies-rail {
+    @apply ml-[2.75rem] border-l-2 border-border/80 pl-4 sm:ml-12;
+  }
+
+  .comment-reply-toggle {
+    @apply mt-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/5;
+  }
+
+  .comment-inline-composer {
+    @apply mt-3 flex gap-2.5;
+  }
+
+  .comment-empty {
+    @apply flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center;
+  }
+
+  .comment-skeleton-row {
+    @apply flex gap-3 py-3;
+  }
+
+  .comment-load-more {
+    @apply mt-2 w-full rounded-full border border-border py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50;
+  }

@@ -1,0 +1,156 @@
+{
+  "iot_telematics_software": [
+    {
+      "question": "Who is responsible for the IoT platform?",
+      "answer": "Amit Kulkarni is responsible for the IoT platform and overall device integration."
+    },
+    {
+      "question": "Who manages the IoT Hub application?",
+      "answer": "The IoT Hub application is managed by the Java backend team led by Rohit Sharma."
+    },
+    {
+      "question": "Who is the Java developer for IoT Hub?",
+      "answer": "Rohit Sharma is the lead Java developer for the IoT Hub platform."
+    },
+    {
+      "question": "Who handles telematics services?",
+      "answer": "Saurabh Verma is responsible for telematics services and integrations."
+    },
+    {
+      "question": "Who is working on OTA updates?",
+      "answer": "Neha Joshi is the Python developer responsible for OTA updates."
+    },
+    {
+      "question": "Who manages device connectivity?",
+      "answer": "Device connectivity is handled by the IoT team led by Amit Kulkarni."
+    },
+    {
+      "question": "Who is responsible for firmware updates?",
+      "answer": "Firmware updates are managed by the OTA team under Neha Joshi."
+    }
+  ],
+  "servers_tcp_mqtt": [
+    {
+      "question": "Who is responsible for TCP servers?",
+      "answer": "Arjun Nair is the dedicated owner of TCP servers."
+    },
+    {
+      "question": "Who manages MQTT servers?",
+      "answer": "Kunal Shah is responsible for MQTT servers and message broker systems."
+    },
+    {
+      "question": "Who handles server downtime issues?",
+      "answer": "Server downtime issues are handled by the infrastructure team led by Priya Sharma."
+    },
+    {
+      "question": "Who is responsible for server monitoring?",
+      "answer": "Rahul Patil monitors server health and uptime."
+    },
+    {
+      "question": "Who should I contact for server issues?",
+      "answer": "You can contact Arjun Nair for TCP servers and Kunal Shah for MQTT servers."
+    }
+  ],
+  "mobile_application": [
+    {
+      "question": "Who is the frontend developer for mobile apps?",
+      "answer": "Sneha Patil is the frontend developer for mobile applications."
+    },
+    {
+      "question": "Who is the backend developer for mobile apps?",
+      "answer": "Ankit Singh is responsible for backend services for mobile applications."
+    },
+    {
+      "question": "Who manages mobile app releases?",
+      "answer": "Mobile app releases are managed by the mobile team coordinated by Sneha Patil."
+    },
+    {
+      "question": "Who handles mobile bugs?",
+      "answer": "Mobile bugs are handled by the mobile team along with QA support."
+    }
+  ],
+  "qa_testing": [
+    {
+      "question": "Who is the QA lead?",
+      "answer": "Pooja Deshmukh is the QA lead."
+    },
+    {
+      "question": "Who is responsible for testing activities?",
+      "answer": "Testing activities are handled by Pooja Deshmukh and Kiran Yadav."
+    },
+    {
+      "question": "Who should I contact for testing issues?",
+      "answer": "You can contact Pooja Deshmukh for testing-related issues."
+    },
+    {
+      "question": "Who handles automation testing?",
+      "answer": "Automation testing is handled by Kiran Yadav."
+    }
+  ],
+  "ai_data_teams": [
+    {
+      "question": "Who is in the AI team?",
+      "answer": "The AI team is led by Vivek Gupta and includes ML engineers."
+    },
+    {
+      "question": "Who is responsible for AI models?",
+      "answer": "AI models are managed by Vivek Gupta."
+    },
+    {
+      "question": "Who is in the data science team?",
+      "answer": "The data science team includes Riya Patel and Aditya Joshi."
+    },
+    {
+      "question": "Who handles data engineering?",
+      "answer": "Data engineering is handled by Sandeep Patil."
+    },
+    {
+      "question": "Who manages data pipelines?",
+      "answer": "Data pipelines are managed by Sandeep Patil and the data engineering team."
+    }
+  ],
+  "project_management": [
+    {
+      "question": "Who is the project manager?",
+      "answer": "Manish Agarwal is the project manager."
+    },
+    {
+      "question": "Who is the scrum master?",
+      "answer": "Nikita Sharma is the scrum master."
+    },
+    {
+      "question": "Who manages sprint planning?",
+      "answer": "Sprint planning is managed by the scrum master Nikita Sharma."
+    },
+    {
+      "question": "Who should I contact for project updates?",
+      "answer": "You can contact Manish Agarwal for project updates."
+    },
+    {
+      "question": "Who handles daily standups?",
+      "answer": "Daily standups are coordinated by Nikita Sharma."
+    }
+  ],
+  "devops_infra": [
+    {
+      "question": "Who is the DevOps lead?",
+      "answer": "Priya Sharma is the DevOps lead."
+    },
+    {
+      "question": "Who handles CI/CD pipelines?",
+      "answer": "CI/CD pipelines are managed by Priya Sharma."
+    },
+    {
+      "question": "Who manages deployments?",
+      "answer": "Deployments are handled by the DevOps team."
+    },
+    {
+      "question": "Who should I contact for production issues?",
+      "answer": "You can contact Priya Sharma for production-related issues."
+    },
+    {
+      "question": "Who is responsible for cloud infrastructure?",
+      "answer": "Cloud infrastructure is managed by the DevOps team."
+    }
+  ]
+}

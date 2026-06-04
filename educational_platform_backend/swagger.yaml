@@ -1,0 +1,3325 @@
+openapi: 3.0.0
+info:
+  title: Swagger BUP - OpenAPI 3.0
+  description:  |
+    # BUP APIs
+    ## This is a BUP server
+    ### Contains APIs to manage the BUP App
+    #### Note that the APIs support Authentication
+    ##### The samples contain Request and Response models
+servers:
+  # - url: https://api.bup-dev.myatos.net/api
+   - url: http://localhost:8081/api
+tags:
+  - name: Authentication
+    description: Operations about Authentication 
+  - name: User
+    description: Operations about user
+  - name: Customer
+    description: Everything about customer
+  - name: BUP
+    description: Everything about revenue
+paths:
+  /Authentication/SignIn:
+    post:
+      tags:
+        - Authentication
+      summary: Logs user into the system
+      description: 'User login with their Email and password'
+      operationId: loginUser
+      requestBody:
+        description: Created user object
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Auth'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Auth'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Auth'
+      responses:
+        default:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Auth'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Auth'
+  /users/create:
+    post:
+      tags:
+        - User
+      summary: Create user
+      description: This can only be done by the logged in user.
+      operationId: createUser
+      requestBody:
+        description: Created user object
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  description: ID of the user
+                Name:
+                  type: string
+                  description: Name of the user
+                email:
+                  type: string
+                  description: Email of the user
+                password:
+                  type: string
+                  description: Password of the user
+                isActive:
+                  type: boolean
+                  description: Status of the user
+                role:
+                  type: array
+                  items:
+                    type: string
+                  description: Roles assigned to the user
+                customer:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      Id:
+                        type: integer
+                      Account:
+                        type: string
+                      Geography:
+                        type: string
+                      Country:
+                        type: string
+                  description: Customers associated with the user
+                geography:
+                  type: string
+                  description: Geography of the user
+                Business_Line:
+                  type: string
+                  description: Business line of the user
+      responses:
+        '200':
+          description: User saved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                  message:
+                    type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '500':
+          description: Unknown error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /users/UpdateUser:
+    put:
+      tags:
+        - User
+      summary: Update an existing userDetails
+      description: Update an existing user by Id
+      operationId: updateUser
+      requestBody:
+        description: Update an existed User
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  description: ID of the user performing the update
+                id:
+                  type: integer
+                  description: ID of the user to update
+                email:
+                  type: string
+                  description: Email of the user
+                clientName:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      Id:
+                        type: integer
+                      Account:
+                        type: string
+                      Geography:
+                        type: string
+                      Country:
+                        type: string
+                  description: Clients associated with the user
+                name:
+                  type: string
+                  description: Name of the user
+                businessLine:
+                  type: string
+                  description: Business line of the user
+                geography:
+                  type: string
+                  description: Geography of the user
+                isActive:
+                  type: boolean
+                  description: Status of the user
+                roles:
+                  type: array
+                  items:
+                    type: string
+                  description: Roles assigned to the user
+          application/xml:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  description: ID of the user performing the update
+                id:
+                  type: integer
+                  description: ID of the user to update
+                email:
+                  type: string
+                  description: Email of the user
+                clientName:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      Id:
+                        type: integer
+                      Account:
+                        type: string
+                      Geography:
+                        type: string
+                      Country:
+                        type: string
+                  description: Clients associated with the user
+                name:
+                  type: string
+                  description: Name of the user
+                businessLine:
+                  type: string
+                  description: Business line of the user
+                geography:
+                  type: string
+                  description: Geography of the user
+                isActive:
+                  type: boolean
+                  description: Status of the user
+                roles:
+                  type: array
+                  items:
+                    type: string
+                  description: Roles assigned to the user
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  description: ID of the user performing the update
+                id:
+                  type: integer
+                  description: ID of the user to update
+                email:
+                  type: string
+                  description: Email of the user
+                clientName:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      Id:
+                        type: integer
+                      Account:
+                        type: string
+                      Geography:
+                        type: string
+                      Country:
+                        type: string
+                  description: Clients associated with the user
+                name:
+                  type: string
+                  description: Name of the user
+                businessLine:
+                  type: string
+                  description: Business line of the user
+                geography:
+                  type: string
+                  description: Geography of the user
+                isActive:
+                  type: boolean
+                  description: Status of the user
+                roles:
+                  type: array
+                  items:
+                    type: string
+                  description: Roles assigned to the user
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  message:
+                    type: string          
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: User not found
+        '500':
+          description: Error updating user and customer consultant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /users/getAll:
+    get:
+      tags:
+        - User
+      summary: Returns all registered users
+      description: Returns all users
+      operationId: getAll
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+      security:
+        - bearerAuth: []  
+  /users/GetAlldetails:
+    get:
+      tags:
+        - User
+      summary: Get all user details
+      description: Retrieve all user details including roles
+      operationId: getAllDetails
+      responses:
+        '200':
+          description: Successfully retrieved user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Id:
+                          type: integer
+                        Email:
+                          type: string
+                        Name:
+                          type: string
+                        Business_Line:
+                          type: string
+                        Geography:
+                          type: string
+                        IsActive:
+                          type: boolean
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+                        roles:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              roleName:
+                                type: string
+        '500':
+          description: Error fetching user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /users/DeleteUser/{id}:
+    delete:
+      tags:
+        - User
+      summary: Delete a user by ID
+      description: Deletes a user and associated data (Useraccountmapping, Role, and Notification) by user ID
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to delete
+      responses:
+        '204':
+          description: Successfully deleted the user
+        '500':
+          description: Unknown error occurred while deleting the user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /users/businessline:
+    get:
+      tags:
+        - User
+      summary: Get and validate business lines for a user
+      description: Retrieve the business lines for a given user and check if a specific business line is included
+      operationId: getAllBl
+      parameters:
+        - name: businessline
+          in: header
+          required: true
+          schema:
+            type: string
+          description: The business line to validate
+        - name: userid
+          in: header
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to retrieve business lines for
+      responses:
+        '200':
+          description: Successfully retrieved and validated business line
+          content:
+            application/json:
+              schema:
+                type: boolean
+        '500':
+          description: Error fetching business lines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  error:
+                    type: string
+  /users/getusersdetail:
+    post:
+      tags:
+        - User
+      summary: Get details of multiple users
+      description: Retrieve user details based on an array of user IDs
+      operationId: getUsersDetail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usersArray:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - usersArray
+      responses:
+        '200':
+          description: Successfully retrieved user details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    Id:
+                      type: integer
+                    Email:
+                      type: string
+                    Name:
+                      type: string
+        '400':
+          description: Invalid usersArray provided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '500':
+          description: An error occurred while fetching user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /users/getGeoClient:
+    post:
+      tags:
+        - User
+      summary: Get distinct clients by geography and country
+      description: Retrieve distinct client accounts based on provided geography and country
+      operationId: getGeoClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                geography:
+                  type: string
+                country:
+                  type: string
+              required:
+                - geography
+                - country
+      responses:
+        '200':
+          description: Successfully retrieved distinct clients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Account:
+                          type: string
+                  message:
+                    type: string
+        '500':
+          description: Error fetching distinct clients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /users/getGeoData:
+    post:
+      tags:
+        - User
+      summary: Get distinct periods by geography, client, and country
+      description: Retrieve distinct periods and transform them into quarters based on provided geography, client, and country
+      operationId: getGeoData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                geography:
+                  type: string
+                client:
+                  type: string
+                country:
+                  type: string
+              required:
+                - geography
+                - client
+                - country
+      responses:
+        '200':
+          description: Successfully retrieved and transformed periods into quarters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                  message:
+                    type: string
+        '500':
+          description: Error fetching periods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /users/deleteGeoClientData:
+    post:
+      tags:
+        - User
+      summary: Delete client data by geography, client, country, and quarter
+      description: Delete client data by setting the Flag to 'false' for the specified geography, client, country, and quarter
+      operationId: deleteGeoClientData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                geography:
+                  type: string
+                client:
+                  type: string
+                country:
+                  type: string
+                Quarter:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - geography
+                - client
+                - country
+                - Quarter
+      responses:
+        '200':
+          description: Successfully deleted client data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '500':
+          description: Error deleting client data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /users/geographies:
+    get:
+      tags:
+        - User
+      summary: Returns all Geographies
+      description: Returns all Geographies
+      operationId: getAllGeographies
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+      security:
+        - bearerAuth: [] 
+  /users/clients:
+    get:
+      tags:
+        - User
+      summary: Returns all clients
+      description: Returns all clients
+      operationId: getAllclients
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+      security:
+        - bearerAuth: [] 
+  /customer/create:
+    post:
+      tags:
+        - Customer
+      summary: Create customer
+      description: This can only be done by the admin role.
+      operationId: createCustomer
+      requestBody:
+        description: Create customer object
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        default:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Customer'
+  /Customers/Update:
+    put:
+      tags:
+        - Customer
+      summary: Update an existing customerDetails
+      description: Update an existing customer by Id
+      operationId: updateCustmer
+      requestBody:
+        description: Update an existed customer
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+        required: true
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerUpdate'          
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CustomerUpdate'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Customer not found
+        '405':
+          description: Validation exception  
+  /Customers/getAll:
+    get:
+      tags:
+        - Customer
+      summary: Returns all customers
+      description: Returns all customers
+      operationId: getAll
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+      security:
+        - bearerAuth: []
+  /Customers/GetAllCustomers:
+    get:
+      tags:
+        - Customer
+      summary: Returns all customerswithidname
+      description: Returns all customerswithidname
+      operationId: getAll
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+      security:
+        - bearerAuth: []
+  /Customers/get-customers-by-geography:
+    post:
+      tags:
+        - Customer
+      summary: Get Customers by geography
+      description: This can only be done by the logged in user.
+      operationId: Get Customers by geography
+      requestBody:
+        description: Get Customers by geography
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientGeo'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/ClientGeo'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientGeo'
+      responses:
+        default:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientGeo'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/ClientGeo' 
+  /Customers/GetAllCustomer:
+    post:
+      tags:
+        - Customer
+      summary: Get Mapped users and customers
+      description: This can only be done by the logged in user.
+      operationId: Get Mapped users and customers
+      requestBody:
+        description: Get Mapped users and customers
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Clientmap'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Clientmap'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Clientmap'
+      responses:
+        default:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Clientmap'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Clientmap' 
+  /Customers/Delete/{id}:
+    delete:
+      tags:
+        - Customer
+      summary: Delete a customer record by ID
+      description: Deletes a customer from the 'Account' table and removes related entries from 'Useraccountmapping'.
+      operationId: deleteCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the customer account to delete.
+          schema:
+            type: string
+            example: "1234"
+      responses:
+        '204':
+          description: Customer record deleted successfully.
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"
+  /Customers/userRoleCustomer:
+    post:
+      tags:
+        - Customer
+      summary: Get all customers based on user roles
+      description: Retrieves customer data based on user roles such as Admin, GBU, Editor, and Viewer.
+      operationId: getAllCustomerRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: The ID of the user.
+                  example: "12345"
+                Version:
+                  type: string
+                  description: The version of customer data to retrieve.
+                  example: "v1.0"
+      responses:
+        '200':
+          description: Successful retrieval of customer roles and grouped accounts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  groupedAccountsArray:
+                    type: array
+                    description: Grouped accounts by geography and country.
+                    items:
+                      type: object
+                      properties:
+                        Geography:
+                          type: string
+                          example: "GrM"
+                        Country:
+                          type: string
+                          example: "MEV"
+                        grouped_name:
+                          type: string
+                          example: "SIEMENS AG"
+                  customers:
+                    type: array
+                    description: List of customers based on the user's role.
+                    items:
+                      type: object
+                      properties:
+                        Id:
+                          type: string
+                          example: "123"
+                        Account:
+                          type: string
+                          example: "Siemens Healthcare"
+                        Geography:
+                          type: string
+                          example: "EU"
+                        Country:
+                          type: string
+                          example: "Germany"
+                        Top:
+                          type: string
+                          example: "Top Acct"
+        '400':
+          description: Invalid request. Missing required parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"
+  /Customers/updateCustomerConsultant:
+    put:
+      tags:
+        - Customer
+      summary: Update Customer-Consultant Mapping
+      description: Updates the mapping of a customer consultant to a new customer account.
+      operationId: updateCustomerConsultant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userid:
+                  type: string
+                  description: ID of the user performing the update.
+                  example: "12345"
+                UserId:
+                  type: string
+                  description: The user ID associated with the consultant.
+                  example: "67890"
+                CustomerId:
+                  type: string
+                  description: The current customer ID.
+                  example: "11111"
+                newCustomerId:
+                  type: string
+                  description: The new customer ID to update the mapping.
+                  example: "22222"
+      responses:
+        '200':
+          description: Successfully updated the customer-consultant mapping.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: integer
+                    example: 1
+        '400':
+          description: Invalid request. Missing required parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error updating customer-consultant"
+                  error:
+                    type: string
+                    example: "Database error details"
+  /Customers/DeleteCustomerConsultant/{UserId}/{CustomerId}:
+    delete:
+      tags:
+        - Customer
+      summary: Delete Customer-Consultant Relationship
+      description: Deletes the mapping between a customer and a consultant.
+      operationId: deleteCustomerConsultant
+      parameters:
+        - name: UserId
+          in: path
+          required: true
+          description: The ID of the consultant user.
+          schema:
+            type: string
+          example: "67890"
+        - name: CustomerId
+          in: path
+          required: true
+          description: The ID of the customer account.
+          schema:
+            type: string
+          example: "11111"
+      responses:
+        '200':
+          description: Successfully deleted the customer-consultant relationship.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Customer-consultant relationship deleted successfully"
+        '400':
+          description: Invalid request. Missing required parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error deleting customer-consultant"
+                  error:
+                    type: string
+                    example: "Database error details"
+  # /quarter/create:
+  #   post:
+  #     tags:
+  #       - Admin
+  #     summary: Create quarters
+  #     description: This can only be done by the admin role.
+  #     operationId: createData
+  #     requestBody:
+  #       description: Create data
+  #       content:
+  #         application/json:
+  #           schema:
+  #             $ref: '#/components/schemas/Admin'
+  #         application/xml:
+  #           schema:
+  #             $ref: '#/components/schemas/Admin'
+  #         application/x-www-form-urlencoded:
+  #           schema:
+  #             $ref: '#/components/schemas/Admin'
+  #     responses:
+  #       default:
+  #         description: successful operation
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: '#/components/schemas/Admin'
+  #           application/xml:
+  #             schema:
+  #               $ref: '#/components/schemas/Admin'
+  /BUPRevenue/getDataRevenueALL:
+    get:
+      tags:
+        - BUP
+      summary: Returns all BUP Data
+      description: Returns all Data of revenue
+      operationId: getAll
+      parameters:
+        - name: client
+          in: header
+          description: ID of supplier to return
+          required: true
+          schema:
+            type: string
+            format: string
+        - name: geography
+          in: header
+          description: ID of supplier to return
+          required: true
+          schema:
+            type: string
+            format: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/Revenues'          
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Revenues'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Supplier not found  
+  /BUPRevenue/GetFormattedData:
+    get:
+      tags:
+        - BUP
+      summary: Returns all data
+      description: Returns all Data of revenue ,cost and FTE
+      operationId: getAll
+      parameters:
+        - name: client
+          in: query
+          description: ID of supplier to return
+          required: true
+          schema:
+            type: string
+            format: string
+        - name: geography
+          in: query
+          description: ID of supplier to return
+          required: true
+          schema:
+            type: string
+            format: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/FormData'          
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/FormData'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Supplier not found   
+  /BUPRevenue/getBL:
+    get:
+      tags:
+        - BUP
+      summary: Returns all businesslines
+      description: Returns all businesslines
+      operationId: getAll
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int32
+  # /BUPRevenue/getAll:
+  #   get:
+  #     tags:
+  #       - All BUPRvenueData
+  #     summary: Returns all Departments data
+  #     description: Returns all Departments data
+  #     operationId: getAll
+  #     responses:
+  #       '200':
+  #         description: successful operation
+  #         content:
+  #           application/json:
+  #             schema:
+  #               type: object
+  #               additionalProperties:
+  #                 type: integer
+  #                 format: int32
+  #     security:
+  #       - bearerAuth: []
+  /BUPRevenue/GetClientsGeographies:
+    get:
+      tags:
+        - BUP
+      summary: Returns all clients based on geography
+      description: Returns all Data of revenue
+      operationId: getAll
+      parameters:
+        - name: client
+          in: query
+          description: Name of client to return
+          required: true
+          schema:
+            type: string
+            format: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/GetClientGeo'          
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/GetClientGeo'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Supplier not foun
+  /BUPRevenue/getAllTrackersData:
+    get:
+      tags:
+        - BUP
+      summary: Get All Tracker Data
+      description: Fetches all tracker data, optionally filtered by account.
+      operationId: getAllTrackersData
+      parameters:
+        - name: account
+          in: query
+          required: false
+          description: Account name to filter tracker data.
+          schema:
+            type: string
+          example: "Account123"
+      responses:
+        '200':
+          description: Successfully retrieved tracker data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        Account:
+                          type: string
+                          example: "Account123"
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2024-02-12T10:30:00Z"
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          example: "2024-02-12T12:00:00Z"
+        '400':
+          description: Invalid request due to incorrect parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error fetching tracker data"
+                  error:
+                    type: string
+                    example: "Database error details" 
+  /BUPRevenue/getAller2pm:
+    get:
+      tags:
+        - BUP
+      summary: Returns all ER2PM Data
+      description: Returns all Data for ER2PM
+      operationId: getAller2pm
+      parameters:
+        - name: client
+          in: header
+          description: Client name to return data for
+          required: true
+          schema:
+            type: string
+        - name: geography
+          in: header
+          description: Geography to return data for
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: header
+          description: Country to return data for
+          required: true
+          schema:
+            type: string
+        - name: userid
+          in: header
+          description: User ID
+          required: true
+          schema:
+            type: string
+        - name: department
+          in: header
+          description: Department name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    BusinessLine:
+                      type: string
+                    Category:
+                      type: string
+                    SubCategory:
+                      type: string
+                    Period:
+                      type: string
+                    Value:
+                      type: number
+                    PC_Division_Name:
+                      type: string
+        '400':
+          description: Invalid header supplied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid header supplied."
+        '404':
+          description: Data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Data not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Unknown error"
+  /BUPRevenue/getClients:
+    get:
+      tags:
+        - BUP
+      summary: Get Clients Data
+      description: Fetches distinct 'Account' values from the 'Accounts' table.
+      operationId: getClients
+      responses:
+        '200':
+          description: Successfully retrieved client data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: string
+                      example: "Client1"
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"   
+  /BUPRevenue/costbaseFinalvalues:
+    get:
+      tags:
+        - BUP
+      summary: Returns the final cost base values
+      description: Fetches and processes cost base values based on client, geography, and other parameters.
+      operationId: costbaseFinalvalues
+      parameters:
+        - name: client
+          in: header
+          description: Client name to return data for
+          required: true
+          schema:
+            type: string
+        - name: geography
+          in: header
+          description: Geography to return data for
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: header
+          description: Country to return data for
+          required: true
+          schema:
+            type: string
+        - name: userid
+          in: header
+          description: User ID
+          required: true
+          schema:
+            type: string
+        - name: department
+          in: header
+          description: Department name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    BusinessLine:
+                      type: string
+                    Category:
+                      type: string
+                    SubCategory:
+                      type: string
+                    Period:
+                      type: string
+                    Value:
+                      type: number
+        '400':
+          description: Invalid header supplied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid header supplied."
+        '404':
+          description: Data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Data not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Unknown error"
+  /BUPRevenue/getGeoView:
+    get:
+      tags:
+        - BUP
+      summary: Returns geographical view data
+      description: Fetches and processes geographical view data based on client, geography, and other parameters.
+      operationId: getGeoView
+      parameters:
+        - name: client
+          in: header
+          description: Client name to return data for
+          required: true
+          schema:
+            type: string
+        - name: geography
+          in: header
+          description: Geography to return data for
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: header
+          description: Country to return data for
+          required: true
+          schema:
+            type: string
+        - name: userid
+          in: header
+          description: User ID
+          required: true
+          schema:
+            type: string
+        - name: pc_division_name
+          in: header
+          description: PC Division Name
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    BusinessLine:
+                      type: string
+                    Category:
+                      type: string
+                    SubCategory:
+                      type: string
+                    Period:
+                      type: string
+                    Value:
+                      type: number
+        '400':
+          description: Invalid header supplied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid header supplied."
+        '404':
+          description: Data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Data not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Unknown error"   
+  /BUPRevenue/getAllActualForecast:
+    get:
+      tags:
+        - BUP
+      summary: Returns Actual and Forecast values
+      description: Fetches Actual and Forecast values based on Geography, Account, and Country.
+      operationId: getAllActualForecast
+      parameters:
+        - name: Geography
+          in: query
+          description: Geography to return data for
+          required: true
+          schema:
+            type: string
+        - name: Account
+          in: query
+          description: Account to return data for
+          required: true
+          schema:
+            type: string
+        - name: Country
+          in: query
+          description: Country to return data for (required if Geography is GrM)
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Geography:
+                          type: string
+                        Account:
+                          type: string
+                        BusinessLine:
+                          type: string
+                        Category:
+                          type: string
+                        SubCategory:
+                          type: string
+                        Quarter:
+                          type: string
+                        Actual:
+                          type: number
+                        Forecast:
+                          type: number
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request parameters."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error fetching data" 
+  /BUPRevenue/getDistictGeographies:
+    get:
+      tags:
+        - BUP
+      summary: Get distinct geographies
+      description: Fetches distinct Geography values from the Accounts table.
+      operationId: getDistictGeographies
+      responses:
+        '200':
+          description: Successfully retrieved distinct geographies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  example: "EMEA"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error fetching geographies" 
+  /BUPRevenue/getAllER2OMNew:
+    post:
+      tags:
+        - BUP
+      summary: Create a new ER2OM record
+      description: Creates a new ER2OM record based on the provided data.
+      operationId: getAllER2OMNew
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                Department:
+                  type: string
+                  example: "Finance"
+                Account:
+                  type: string
+                  example: "ATOS"
+                geography:
+                  type: string
+                  example: "INDIA"
+                BusinessLine:
+                  type: string
+                  example: "DWP"
+                Category:
+                  type: string
+                  example: "Revenue"
+                SubCategory:
+                  type: string
+                  example: "ER Sales of Service"
+                FTE_Impact:
+                  type: string
+                  example: "High"
+                Timing:
+                  type: string
+                  example: "Monthly"
+                Source:
+                  type: string
+                  example: "ER2OM"
+                Start:
+                  type: string
+                  format: date
+                  example: "2023-01-01"
+                End:
+                  type: string
+                  format: date
+                  example: "2023-12-31"
+                ER:
+                  type: number
+                  example: 1000
+                PM:
+                  type: number
+                  example: 500
+                Cost:
+                  type: number
+                  example: 200
+                PM_Percentage:
+                  type: number
+                  example: 10
+                FTE_High:
+                  type: number
+                  example: 1
+                FTE_LowGDC:
+                  type: number
+                  example: 2
+                FTE_SubCo:
+                  type: number
+                  example: 3
+                SGA_Function:
+                  type: string
+                  example: "Support"
+                Description:
+                  type: string
+                  example: "Description of the record"
+                Country:
+                  type: string
+                  example: "Germany"
+      responses:
+        '201':
+          description: Record created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Record created successfully"
+                  record:
+                    type: object
+                    properties:
+                      userId:
+                        type: integer
+                      Name:
+                        type: string
+                      Department:
+                        type: string
+                      Geography:
+                        type: string
+                      BusinessLine:
+                        type: string
+                      Source:
+                        type: string
+                      Country:
+                        type: string
+                      Category:
+                        type: string
+                      SubCategory:
+                        type: string
+                      FTE_Impact:
+                        type: boolean
+                      Timing:
+                        type: string
+                      StartDate:
+                        type: string
+                        format: date
+                      EndDate:
+                        type: string
+                        format: date
+                      ER_MO:
+                        type: number
+                      PM_MO:
+                        type: number
+                      Cost:
+                        type: number
+                      PM_Percentage:
+                        type: number
+                      FTE_High:
+                        type: number
+                      FTE_LowGDC:
+                        type: number
+                      FTE_SubCo:
+                        type: number
+                      SGA_Function:
+                        type: string
+                      Description:
+                        type: string
+                      isActive:
+                        type: boolean
+                      reviewStatus:
+                        type: string
+                      last_updated_by:
+                        type: string
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"              
+  /BUPRevenue/commitTrackerData:
+    post:
+      tags:
+        - BUP
+      summary: Commit tracker data
+      description: Approves or rejects tracker records based on user role and review status.
+      operationId: commitTrackerData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                trackerIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [101, 102, 103]
+                isActive:
+                  type: boolean
+                  example: true
+                reviewStatus:
+                  type: string
+                  enum: ["accepted", "rejected"]
+                  example: "accepted"
+                Comment:
+                  type: string
+                  example: "Requires additional details for approval."
+      responses:
+        '200':
+          description: Tracker data committed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Tracker data committed successfully"
+        '400':
+          description: Invalid request due to missing or incorrect parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request. trackerIds should be an array of IDs."
+        '403':
+          description: Access denied due to insufficient permissions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Access denied. Insufficient permissions."
+        '404':
+          description: No inactive records found for the provided Account and Geography.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "No inactive records found for the provided Account and Geography."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Unknown error"                             
+  /BUPRevenue/getAllnew:
+    post:
+      tags:
+        - BUP
+      summary: Create a new tracker record
+      description: Adds a new record to the Tracker table and generates a tracker history entry.
+      operationId: getAllNew
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                Department:
+                  type: string
+                  example: "Finance"
+                geography:
+                  type: string
+                  example: "North America"
+                Account:
+                  type: string
+                  example: "Siemens Ltd"
+                BusinessLine:
+                  type: string
+                  example: "IT Services"
+                Category:
+                  type: string
+                  example: "Cost Optimization"
+                SubCategory:
+                  type: string
+                  example: "Cloud Migration"
+                FTE_Impact:
+                  type: boolean
+                  example: false
+                Timing:
+                  type: string
+                  example: "Q1 2025"
+                Source:
+                  type: string
+                  example: "Internal"
+                Start:
+                  type: string
+                  format: date
+                  example: "2025-03-01"
+                End:
+                  type: string
+                  format: date
+                  example: "2025-06-30"
+                ER:
+                  type: number
+                  example: 50000
+                PM:
+                  type: number
+                  example: 2000
+                Cost:
+                  type: number
+                  example: 100000
+                PM_Percentage:
+                  type: number
+                  example: 5
+                FTE_High:
+                  type: number
+                  example: 10
+                FTE_LowGDC:
+                  type: number
+                  example: 2
+                FTE_SubCo:
+                  type: number
+                  example: 3
+                SGA_Function:
+                  type: string
+                  example: "Operations"
+                Description:
+                  type: string
+                  example: "Cloud migration project to reduce IT costs."
+                Country:
+                  type: string
+                  example: "USA"
+      responses:
+        '201':
+          description: Successfully created a new record.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Record created successfully"
+                  record:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      userId:
+                        type: integer
+                        example: 123
+                      Name:
+                        type: string
+                        example: "John Doe"
+                      Department:
+                        type: string
+                        example: "Finance"
+                      Geography:
+                        type: string
+                        example: "North America"
+                      Account:
+                        type: string
+                        example: "Siemens Ltd"
+                      BusinessLine:
+                        type: string
+                        example: "IT Services"
+                      Category:
+                        type: string
+                        example: "Cost Optimization"
+                      SubCategory:
+                        type: string
+                        example: "Cloud Migration"
+                      StartDate:
+                        type: string
+                        format: date-time
+                        example: "2025-03-01T00:00:00Z"
+                      EndDate:
+                        type: string
+                        format: date-time
+                        example: "2025-06-30T00:00:00Z"
+                      last_updated_by:
+                        type: string
+                        example: "user@example.com"
+        '400':
+          description: Invalid request due to missing or incorrect parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid input data."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"
+  
+  /trackhistory/getAll:
+    post:
+      tags:
+        - TrackerHistory
+      summary: Get all tracker history records
+      description: Retrieve all records from the TrackerHistory table
+      operationId: getAllTrackerHistory
+      responses:
+        '200':
+          description: Successfully retrieved tracker history records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrackerHistory'
+        '500':
+          description: Internal server error
+  
+  /trackhistory/notificationgetAll:
+    get:
+      tags:
+        - Notification
+      summary: Get all notifications
+      description: Retrieve all records from the Notification table including Account and BusinessLine from Tracker table
+      operationId: getAllNotifications
+      responses:
+        '200':
+          description: Successfully retrieved notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '500':
+          description: Internal server error
+  
+  /trackhistory/getTrackerData:
+    get:
+      tags:
+        - TrackerHistory
+      summary: Get tracker data by ID
+      description: Retrieve tracker data based on provided tracker IDs
+      operationId: getTrackerData
+      parameters:
+        - name: trackerid
+          in: header
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Successfully retrieved tracker data
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid tracker IDs provided
+        '404':
+          description: Tracker data not found
+        '500':
+          description: Internal server error
+  
+  /trackhistory/getNotificationData:
+    get:
+      tags:
+        - Notification
+      summary: Get notification data by ID
+      description: Retrieve notification data based on provided IDs and update notifyStatus
+      operationId: getNotificationData
+      parameters:
+        - name: id
+          in: header
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: notifystatus
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved and updated notification data
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid tracker IDs or notify status not provided
+        '404':
+          description: Notification data not found
+        '500':
+          description: Internal server error   
+  /trackRecord/GetAllNewTrackData:
+    get:
+      tags:
+        - Tracker
+      summary: Get all track data
+      description: Retrieve all records from the Tracker table within a database transaction.
+      operationId: getAllNewTrack
+      responses:
+        '200':
+          description: Successfully retrieved track data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tracker'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error fetching trackdata"
+                  error:
+                    type: string
+                    example: "Database connection failed"
+  /trackRecord/getNewTrackData:
+    post:
+      tags:
+        - Tracker
+      summary: Get filtered track data
+      description: Retrieve track records from the Tracker table based on user role, account, geography, and business line within a database transaction.
+      operationId: getNewTrackData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "123"
+                clientName:
+                  type: string
+                  example: "ABC Corp"
+                geography:
+                  type: string
+                  example: "North America"
+      responses:
+        '200':
+          description: Successfully retrieved track data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tracker'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: array
+                example: [] 
+  /trackRecord/getER2OMTrackData:
+    post:
+      tags:
+        - Tracker
+      summary: Get ER2OM track data
+      description: Retrieve track records from the Tracker table based on geography, business line, and source type (ER2OM) within a database transaction.
+      operationId: getER2OMTrackData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "123"
+                clientName:
+                  type: string
+                  example: "ABC Corp"
+                geography:
+                  type: string
+                  example: "North America"
+      responses:
+        '200':
+          description: Successfully retrieved ER2OM track data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tracker'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: array
+                example: [] 
+  /trackRecord/UpdateNewTrackData:
+    put:
+      tags:
+        - Tracker
+      summary: Update track data
+      description: Update a tracker record with new data, maintaining history and triggering notifications if necessary.
+      operationId: UpdateNewTrackData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "05d96a30-2aac-4ddd-8bfd-1d18ccca82ad"
+                Id:
+                  type: string
+                  example: "05d96a30-2aac-4ddd-8bfd-1d18ccca82ad"
+                Department:
+                  type: string
+                  example: "null"
+                geography:
+                  type: string
+                  example: "North America"
+                Account:
+                  type: string
+                  example: "ABC Corp"
+                BusinessLine:
+                  type: string
+                  example: "BWP"
+                Category:
+                  type: string
+                  example: "Ext Rev"
+                SubCategory:
+                  type: string
+                  example: "VAR"
+                FTE_Impact:
+                  type: integer
+                  example: 0
+                Timing:
+                  type: string
+                  example: "Monthly"
+                Start:
+                  type: string
+                  format: date
+                  example: "2024-03-01"
+                End:
+                  type: string
+                  format: date
+                  example: "2024-06-30"
+                ER:
+                  type: number
+                  example: 23
+                PM:
+                  type: number
+                  example: 5
+                Cost:
+                  type: number
+                  example: -18
+                PM_Percentage:
+                  type: number
+                  example: 21.74
+                FTE_High:
+                  type: integer
+                  example: 0
+                FTE_LowGDC:
+                  type: integer
+                  example: 0
+                FTE_SubCo:
+                  type: integer
+                  example: 0
+                SGA_Function:
+                  type: string
+                  example: "false"
+                Description:
+                  type: string
+                  example: "Updating cost estimates for Q1"
+                isActive:
+                  type: boolean
+                  example: true
+                reviewStatus:
+                  type: string
+                  enum: ["pending", "accepted", "rejected"]
+                  example: "pending"
+                Comment:
+                  type: string
+                  example: "Review needed for updated costs"
+      responses:
+        '200':
+          description: Successfully updated track data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tracker'
+        '404':
+          description: Tracker record not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Tracker record not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "unknown_error"
+  /trackRecord/UpdateER2OMTrackData:
+    put:
+      tags:
+        - Tracker
+      summary: Update ER to OM track data
+      description: Updates an existing tracker record with new data. Sends a notification to the SPOC upon successful update.
+      operationId: UpdateER2OMTrackData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "05d96a30-2aac-4ddd-8bfd-1d18ccca82ad"
+                Id:
+                  type: string
+                  example: "05d96a30-2aac-4ddd-8bfd-1d18ccca82ad"
+                Department:
+                  type: string
+                  example: "IT"
+                geography:
+                  type: string
+                  example: "North America"
+                BusinessLine:
+                  type: string
+                  example: "Finance"
+                Category:
+                  type: string
+                  example: "Operations"
+                SubCategory:
+                  type: string
+                  example: "Sub-Operations"
+                FTE_Impact:
+                  type: integer
+                  example: 5
+                Timing:
+                  type: string
+                  example: "Q1 2024"
+                Start:
+                  type: string
+                  format: date
+                  example: "2024-03-01"
+                End:
+                  type: string
+                  format: date
+                  example: "2024-06-30"
+                ER:
+                  type: number
+                  example: 10000
+                PM:
+                  type: number
+                  example: 5000
+                Cost:
+                  type: number
+                  example: 15000
+                PM_Percentage:
+                  type: number
+                  example: 10
+                FTE_High:
+                  type: integer
+                  example: 8
+                FTE_LowGDC:
+                  type: integer
+                  example: 2
+                FTE_SubCo:
+                  type: integer
+                  example: 3
+                SGA_Function:
+                  type: string
+                  example: "HR"
+                Description:
+                  type: string
+                  example: "Updating cost estimates for Q1"
+                isActive:
+                  type: boolean
+                  example: true
+                reviewStatus:
+                  type: string
+                  enum: ["pending", "accepted", "rejected"]
+                  example: "pending"
+                Comment:
+                  type: string
+                  example: "Review needed for updated costs"
+      responses:
+        '200':
+          description: Successfully updated tracker data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tracker record updated successfully."
+        '404':
+          description: Tracker record not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Tracker record not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "An error occurred while updating tracker data."
+  /trackRecord/updateComment:
+    put:
+      tags:
+        - Tracker
+      summary: Update comments for multiple tracker records
+      description: Updates the comment field for multiple tracker records based on the provided IDs.
+      operationId: updateComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Id:
+                  type: array
+                  items:
+                    type: string
+                  example: ["5678", "1234"]
+                comment:
+                  type: string
+                  example: "Updated comment for review"
+      responses:
+        '200':
+          description: Successfully updated comments for tracker records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Comments update completed"
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Id:
+                          type: string
+                          example: "5678"
+                        status:
+                          type: boolean
+                          example: true
+                        message:
+                          type: string
+                          example: "Comment updated successfully"
+        '400':
+          description: Invalid request - Missing or incorrect data format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Invalid request. An array of IDs is required."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Unknown error"
+  /trackRecord/deleteNewTrackData/{id}:
+    delete:
+      tags:
+        - Tracker
+      summary: Delete a tracker record by ID
+      description: Deletes a specific tracker record and its related notifications.
+      operationId: deleteNewTrackData
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the tracker record to delete.
+          schema:
+            type: string
+            example: "5678"
+      responses:
+        '204':
+          description: Tracker record deleted successfully.
+        '404':
+          description: Tracker record not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Tracker record not found."
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "An unknown error occurred."
+  /quarter/rawexcelpost:
+    post:
+      tags:
+        - Admin
+      summary: Upload and process an Excel file
+      description: Reads an uploaded Excel file, processes the data, and inserts it into the database.
+      operationId: rawexcelpost
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Data successfully uploaded and processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Data successfully uploaded and processed."
+        '400':
+          description: Invalid file or columns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid columns. Missing required columns: ... Extra columns: ..."
+        '413':
+          description: Payload too large
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Cannot upload more than X records. You attempted to upload Y records."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "An error occurred while processing data. Please try again later."
+                  error:
+                    type: string
+                    example: "Detailed error message"
+  /quarter/notificationBanner:
+    get:
+      tags:
+        - Admin
+      summary: Fetch all notification banners
+      description: Fetches all notification banners and formats their dates to the Asia/Kolkata timezone.
+      operationId: getNotificationBanners
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        title:
+                          type: string
+                          example: "Maintenance Notification"
+                        startDate:
+                          type: string
+                          format: date-time
+                          example: "2023-12-01T00:00:00+05:30"
+                        endDate:
+                          type: string
+                          format: date-time
+                          example: "2023-12-01T23:59:59+05:30"
+                        message:
+                          type: string
+                          example: "Scheduled maintenance will occur on the 1st of December."
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+        '404':
+          description: Notifications not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Notifications not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error fetching notification details"
+                  error:
+                    type: string
+                    example: "Detailed error message"
+  /quarter/updateMaintenance:
+    put:
+      tags:
+        - Admin
+      summary: Update maintenance scheduler
+      description: Updates a maintenance scheduler entry based on the provided data.
+      operationId: updateMaintenance
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Id:
+                  type: integer
+                  example: 1
+                userId:
+                  type: integer
+                  example: 123
+                startDateTime:
+                  type: string
+                  format: date-time
+                  example: "2023-12-01T00:00:00+05:30"
+                endDateTime:
+                  type: string
+                  format: date-time
+                  example: "2023-12-01T23:59:59+05:30"
+                Message:
+                  type: string
+                  example: "Scheduled maintenance will occur on the 1st of December."
+                Status:
+                  type: string
+                  example: "Scheduled"
+      responses:
+        '200':
+          description: Scheduler updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Scheduler updated successfully"
+                  data:
+                    type: object
+                    properties:
+                      Id:
+                        type: integer
+                      startDate:
+                        type: string
+                        format: date-time
+                      endDate:
+                        type: string
+                        format: date-time
+                      Message:
+                        type: string
+                      Status:
+                        type: string
+                      last_updated_by:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+        '403':
+          description: Access denied due to insufficient permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Access denied. Insufficient permissions."
+        '404':
+          description: Scheduler entry not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Scheduler entry not found."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error updating scheduler"
+                  error:
+                    type: string
+                    example: "Detailed error message"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        Name:
+          type: string
+          example: 'john'
+        email:
+          type: string
+          example: john@email.com
+        password:
+          type: string
+          example: 'Abc@123'
+        isActive:
+          type: boolean
+          example: true
+        customer:
+          type: string
+          example: ["640d9079-cc29-4e4e-9b41-048ed53b6a74","43c56382-f8a4-4341-9bce-ac66859957fe"]
+        geography:
+          type: string
+          example: ["UKIR","FR","APAC"]
+        role:
+          type: string
+          example: ["Admin","Spoc"]
+      xml:
+        name: user
+    Admin:
+      type: object
+      properties:
+        year:
+          type: string
+          example: '2021'
+      xml:
+        name: admin
+    UserUpdate:
+      type: object
+      properties:
+        id:
+          type: UUID
+          example: 4b42ee5d-3aa4-4f1b-8e0b-a8bace911a68
+        userId:
+          type: UUID
+          example: 4b42ee5d-3aa4-4f1b-8e0b-a8bace911a68
+        email:
+          type: string
+          example: abc@gmail.com
+        name:
+          type: string
+          example: username
+        businessLine:
+          type: string
+          example: [DWP,HCI]
+        Geography:
+          type: string
+          example: ["UKIR","FR","APAC"]
+        isActive:
+          type: boolean
+          example: true
+        roles:
+          type: string
+          example: ["Admin","Spoc"]
+      xml:
+        name: UserUpdate
+    CustomerUpdate:
+      type: object
+      properties:
+        Customer:
+          type: string
+          example: Atos
+        userId:
+          type: string
+          example: INDIA
+        id:
+          type: string
+          example: Atos
+        Geography:
+          type: string
+          example: IN
+      xml:
+        name: CustomerUpdate
+    Customer:
+      type: object
+      properties:
+        geography:
+          type: string
+          example: IN
+        country:
+          type: string
+          example: INDIA
+        customer:
+          type: string
+          example: Atos
+        iris:
+          type: string
+          example: IND
+        top:
+          type: string
+          example: '1'
+        diamond:
+          type: string
+          example: '1'
+      xml:
+        name: customer
+    ClientGeo:
+      type: object
+      properties:
+        geography:
+          type: string
+          example: ["IN"]
+        Version:
+          type: string
+          example: "Latest"
+      xml:
+        name: revenues
+    Clientmap:
+      type: object
+      properties:
+        clientId:
+          type: string
+          example: 69a18f00-30fc-4b25-9839-c786573caeaf
+      xml:
+        name: revenues
+    Revenues:
+      type: object
+      properties:
+        client:
+          type: string
+          example: Atos
+        geography:
+          type: string
+          example: IN
+      xml:
+        name: revenues
+    FormData:
+      type: object
+      properties:
+        client:
+          type: string
+          example: Atos
+        geography:
+          type: string
+          example: IN
+      xml:
+        name: formdata
+    GetClientGeo:
+      type: object
+      properties:
+        client:
+          type: string
+          example: Atos
+      xml:
+        name: formdata
+    Auth:
+      type: object
+      properties:
+        email:
+          type: string
+          example: john@gmail.com
+        password:
+          type: string
+          example: 'Abc@123'
+      xml:
+        name: auth
+    TrackerHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Notification:
+      type: object
+      properties:
+        Id:
+          type: string
+        Message:
+          type: string
+        Status:
+          type: string
+        Geography:
+          type: string
+        notifyStatus:
+          type: string
+        Name:
+          type: string
+        Source:
+          type: string
+        trackerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        Comment:
+          type: string
+        Account:
+          type: string
+        BusinessLine:
+          type: string
+    Tracker:
+        name:
+          type: string
+          example: "Tracker 1"
+        id:
+          type: string
+          example: "05d96a30-2aac-4ddd-8bfd-1d18ccca82ad"
+        Geography:
+          type: string
+          example: "North America"
+        BusinessLine:
+          type: string
+          example: "Finance"
+        Source:
+          type: string
+          example: "er2om"
+        isActive:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-02-12T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-02-12T10:05:00Z"  
+        Department:
+          type: string
+          example: "IT"
+        Category:
+          type: string
+          example: "Operations"
+        SubCategory:
+          type: string
+          example: "Sub-Operations"
+        FTE_Impact:
+          type: integer
+          example: 5
+        Timing:
+          type: string
+          example: "Q1 2024"
+        StartDate:
+          type: string
+          format: date
+          example: "2024-03-01"
+        EndDate:
+          type: string
+          format: date
+          example: "2024-06-30"
+        ER_MO:
+          type: number
+          example: 10000
+        PM_MO:
+          type: number
+          example: 5000
+        Cost:
+          type: number
+          example: 15000
+        PM_Percentage:
+          type: number
+          example: 10
+        FTE_High:
+          type: integer
+          example: 8
+        FTE_LowGDC:
+          type: integer
+          example: 2
+        FTE_SubCo:
+          type: integer
+          example: 3
+        SGA_Function:
+          type: string
+          example: "HR"
+        Description:
+          type: string
+          example: "Updating cost estimates for Q1"
+        reviewStatus:
+          type: string
+          example: "pending"
+        Comment:
+          type: string
+          example: "Review needed for updated costs"
+        last_updated_by:
+          type: string
+          example: "user@example.com"
+
+  requestBodies:
+    Pet:
+      description: Pet object that needs to be added to the store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Pet'
+        application/xml:
+          schema:
+            $ref: '#/components/schemas/Pet'
+    UserArray:
+      description: List of user object
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/User'
+  securitySchemes:
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      name: "authorization"
+      in: 'header'
+      bearerFormat: JWT
+security:
+  - bearerAuth: []
+
+#   securitySchemes:
+#     ssoAuth:
+#       type: "http"
+#       in: 'header'
+#       name: "Authorization"
+#       authorizationUrl: https://wacstg.das.myatos.net/sso_cond2fa_256/SingleSignOnService
+# security:
+#   - ssoAuth: []

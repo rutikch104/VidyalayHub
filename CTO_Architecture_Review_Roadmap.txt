@@ -1,0 +1,889 @@
+================================================================================
+  VIDHYALAYHUB — CTO ARCHITECTURE REVIEW & SEPTEMBER PRODUCTION ROADMAP
+================================================================================
+Date: June 2026 | Prepared by: CTO / Architect Review
+
+================================================================================
+SECTION 1: ARCHITECTURE ASSESSMENT
+================================================================================
+
+1.1 FRONTEND ARCHITECTURE
+--------------------------
+Current State:
+- React 18 + Vite (SWC) + Tailwind CSS + shadcn/ui + Radix UI
+- react-router-dom is installed but UNUSED — navigation is 100% state-driven
+  via a `currentPage` string in App.jsx
+- TanStack React Query is installed but not consistently used for data fetching
+- All app code compiles into a single index.js chunk (~538KB, gzip: 151KB)
+  with no route-based code splitting
+- No URL-based routing means deep links, browser back/forward, bookmarks,
+  and shared URLs are all broken
+- framer-motion + Radix UI + all icon variants loaded eagerly
+
+Critical Issues:
+- No URL routing — cannot share a direct link to a specific page or feature
+- Single fat bundle — slower initial load for all users
+- No service worker / offline support
+- No error boundary at route level — one component crash takes down the full app
+
+Technical Debt:
+- App.jsx contains renderCurrentPage() — a growing switch statement (God component)
+- State management is prop-drilling + context — no structured server-state layer
+- CSS split across platform-premium.css, index.css, and inline Tailwind
+
+
+1.2 BACKEND ARCHITECTURE
+-------------------------
+Current State:
+- Node.js 20 + Express 5 + Sequelize ORM + PostgreSQL
+- 29 route files, 34 controllers, 67 Sequelize models
+- 17 ensureXSchema.js DDL migration scripts run on every server startup
+- PM2 cluster mode configured (ecosystem.config.js)
+- Dockerfile exists — Alpine Node 20, multi-stage build, production-ready
+- winston logging, AWS S3 SDK, StorageService abstraction in place
+
+Critical Issues:
+  Issue                                 File                     Impact
+  -------                               ----                     ------
+  Dev pool acquire:1800000ms (30 min)   db/config.js:40-44       Silent hangs
+  database/index.js imports db/config   database/index.js        Wrong pool in prod
+  No token revocation/blacklist         middleware/auth.js        Stolen JWT valid 7d
+  No refresh token flow                 helpers/tokens.js         Re-login every 7d
+  Synchronous OpenAI LLM calls          aiInterviewController.js  2-8s event loop block
+  17 DDL scripts on every startup       database/ensure*Schema.js 200-500ms per restart
+  contentSecurityPolicy: false          middleware/securityStack  Full XSS exposure
+  No CI/CD pipeline                     (none)                    Manual broken deploys
+
+
+1.3 DATABASE ARCHITECTURE
+--------------------------
+Current State:
+- Single PostgreSQL database, shared schema multi-tenancy via tenant_id column
+- PostgreSQL RLS middleware exists (middleware/tenantRls.js) but DISABLED by default
+- 67 Sequelize models, schema evolution via ensureXSchema.js pattern
+- No Sequelize migration files (no sequelize-cli migrations/ folder)
+- No read replica, no connection pooler (PgBouncer)
+
+Missing Indexes (High Certainty):
+- (tenant_id, created_at DESC) on posts, notifications, events, jobs
+- (tenant_id, user_id) on connections, follows
+- (tenant_id, status) on job_applications
+- user_id on messages (conversation lookups)
+
+Risks:
+- No formal migration system — no rollback path for schema changes
+- ensureXSchema scripts cannot drop or rename columns — schema debt accumulates
+- No backup schedule documented; RDS PITR not yet configured
+
+
+1.4 DEPLOYMENT ARCHITECTURE
+----------------------------
+Current State:
+- Dockerfile exists — production-ready Alpine image, multi-stage build, HEALTHCHECK
+- PM2 ecosystem.config.js for bare-metal / EC2 cluster mode
+- No docker-compose.yml
+- No CI/CD pipelines (no .github/workflows/, no CodePipeline)
+- No infrastructure-as-code (no Terraform, CDK, or CloudFormation)
+- Swagger YAML exists (API documented)
+
+AWS Readiness:
+- STORAGE_PROVIDER=s3 path coded and ready (StorageService abstraction)
+- AWS SDK @aws-sdk/client-s3 installed
+- No ECS task definition, no ALB config, no CloudFront distribution
+- No Secrets Manager integration — secrets are .env files
+- No CloudWatch agent or structured log shipping
+
+
+1.5 RISK SUMMARY FOR SEPTEMBER LAUNCH
+----------------------------------------
+  Risk                                            Severity    Likelihood
+  ----                                            --------    ----------
+  Dev DB pool (acquire:1800000) silent hangs      Critical    High
+  JWT_SECRET default used in prod                 Critical    Medium
+  No CI/CD — broken code ships to prod            Critical    High
+  No URL routing — bad UX, SEO zero               High        Certain
+  Synchronous LLM calls → timeouts under load     High        High
+  Local disk storage breaks horizontal scaling    High        Certain
+  No token revocation → account takeover risk     High        Medium
+  No Redis → every hot-path hits Postgres         High        Certain
+  No composite indexes → feed full-scan at 10K    High        High
+  No automated testing before deploys             High        Certain
+
+
+================================================================================
+SECTION 2: SAAS / MULTI-TENANT STRATEGY
+================================================================================
+
+Recommendation: Shared Database, Row-Level Security
+-----------------------------------------------------
+Decision: Shared PostgreSQL with tenant_id RLS — already partially implemented.
+Complete it.
+
+Do NOT switch to per-tenant databases before September. The shared schema is
+correct for a pilot with 1–10 colleges. Per-tenant databases add operational
+complexity (N connection pools, N migration runs, N backups) unjustifiable now.
+
+  Dimension             Recommendation                                    Priority
+  ---------             --------------                                    --------
+  Isolation             Enable ENABLE_TENANT_RLS=true in production       Critical
+  Onboarding            Add provisioning webhook + email confirmation      High
+  Provisioning          Create tenant → send admin invite → seed RBAC      High
+  Config management     Add tenant_settings JSONB column on tenants table  High
+  Branding              Move logo/colors to S3 + CloudFront CDN            High
+  User management       Per-tenant admin portal + bulk CSV import           Medium
+  Roles & permissions   RBAC schema exists; enforce in all controllers     High
+  Analytics             Per-tenant event logging table                     Medium
+  Data isolation        RLS on all 67 models; audit RLS coverage           Critical
+
+
+Tenant Onboarding Flow (Recommended):
+---------------------------------------
+  Super Admin creates Tenant (name, slug, type, email)
+    → Tenant row inserted (status: 'pending')
+    → System sends onboarding email to institution admin
+    → Admin completes profile / uploads logo
+    → Super Admin approves (status: 'approved')
+    → System auto-provisions: default RBAC roles, welcome post, default branding
+    → Admin receives "your portal is live" email with URL
+
+  Automation target: < 5 minutes from creation to live portal, zero manual steps.
+
+
+Multi-Tenant Configuration Schema (tenant_settings JSONB):
+-----------------------------------------------------------
+  {
+    "features": {
+      "ai_interview": true,
+      "resource_library": true,
+      "jobs_board": true,
+      "communities": true,
+      "events": true
+    },
+    "limits": {
+      "max_users": 5000,
+      "max_storage_gb": 50,
+      "max_posts_per_day": 1000
+    },
+    "branding": {
+      "primary_color": "#2563eb",
+      "theme": "default"
+    },
+    "notifications": {
+      "email_from": "noreply@college.edu"
+    }
+  }
+
+
+================================================================================
+SECTION 3: FRONTEND ROADMAP
+================================================================================
+
+CRITICAL (Must ship before September)
+---------------------------------------
+
+C1. URL-Based Routing
+  Replace state-driven currentPage navigation with react-router-dom v6 (already
+  installed). Every page gets a URL.
+  Routes:
+    /               → Feed/Home
+    /network        → Network
+    /jobs           → Jobs
+    /events         → Events
+    /library        → Library
+    /community      → Communities
+    /profile/:userId → User Profile
+    /settings       → Settings
+    /admin          → Admin Portal
+  Effort: 2–3 days
+
+C2. Route-Based Code Splitting
+  Heavy pages should use lazy() + Suspense.
+  Target: initial bundle under 200KB gzip.
+  Example:
+    const AIInterview = lazy(() => import('./components/AIInterview'));
+  Effort: 2 days
+
+C3. Error Boundaries at Route Level
+  Wrap each route in <ErrorBoundary>. One broken component should not crash
+  the whole app. Effort: 1 day
+
+C4. React Query Consistent Usage
+  Enforce useQuery / useMutation from TanStack React Query across all
+  data-fetching. Add queryClient provider at root. Effort: 3 days
+
+C5. Mobile Responsiveness Audit
+  Run Lighthouse mobile audit on all core pages.
+  Minimum target: Lighthouse mobile performance score >= 70.
+  Effort: 2 days
+
+
+HIGH PRIORITY (Week 1–4 post-launch)
+--------------------------------------
+
+H1. Multi-Tenant Branding Support
+  Load tenant-specific CSS variables from TenantContext (primary color, logo).
+
+H2. Accessibility (a11y)
+  Add aria-label on all icon-only buttons.
+  Ensure focus rings visible. Color contrast >= 4.5:1.
+  Legal requirement for educational institutions.
+
+H3. Analytics Integration
+  Add Plausible or PostHog self-hosted for page views and feature usage tracking.
+
+H4. Progressive Loading
+  Add skeleton loaders to all list views (network cards, feed, jobs).
+  Already have NetworkSkeleton — extend the pattern everywhere.
+
+
+NICE-TO-HAVE (Phase 2)
+------------------------
+  - PWA / Service Worker for offline support
+  - SEO meta tags (React Helmet)
+  - Dark mode / theme switching (next-themes already installed)
+  - Keyboard shortcut system for power users
+  - Toast notification system (Sonner already installed)
+
+
+================================================================================
+SECTION 4: BACKEND ROADMAP
+================================================================================
+
+CRITICAL
+---------
+
+C1. Fix the DB Pool Configuration
+  In db/config.js development block:
+  CURRENT (dangerous):  pool: { max: 50, min: 30, acquire: 1800000, idle: 1800000 }
+  FIX:                  pool: { max: 10, min: 1,  acquire: 30000,   idle: 10000  }
+  Also update database/index.js to use config/env.js pool settings.
+
+C2. Enforce Non-Default JWT_SECRET at Startup
+  Add to server.js bootstrap:
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change-me-in-production') {
+      if (isProduction) { console.error('FATAL: JWT_SECRET default'); process.exit(1); }
+    }
+
+C3. Move LLM Calls Off the Request Thread
+  Install bull (Redis queue) or use AWS SQS:
+  1. Accept request → create job record → return 202 Accepted with job_id
+  2. Worker picks up job → calls OpenAI → writes result → updates record
+  3. Frontend polls /api/ai-interview/jobs/:id for result
+
+C4. Set SKIP_SEQUELIZE_SYNC=true in Production
+  Add npm run migrate as ensureXSchema runner called ONCE on deploy,
+  not on every pod restart. Rolling deploys trigger multiple simultaneous DDL runs.
+
+C5. Enable ENABLE_TENANT_RLS=true in Production
+  Audit all 67 models to confirm tenant_id is present and indexed.
+
+
+HIGH PRIORITY
+--------------
+
+H1. Refresh Token Flow
+  Add refresh_tokens table. Issue 15-min access tokens + 30-day refresh tokens.
+
+H2. JWT Revocation (Redis Denylist)
+  On logout or account deactivation, add JWT jti to Redis set with matching TTL.
+  Check on every authenticate() call.
+
+H3. Enable ContentSecurityPolicy
+  Replace contentSecurityPolicy: false with real CSP directives in Helmet.
+
+H4. Add Composite Indexes
+  CREATE INDEX CONCURRENTLY IF NOT EXISTS:
+    (tenant_id, created_at DESC) on posts, notifications, events, jobs
+    (tenant_id, user_id) on connections, follows, bookmarks
+    (tenant_id, status, created_at DESC) on job_applications
+    (conversation_id, created_at DESC) on messages
+
+H5. Structured Logging + Request Tracing
+  Add correlation_id (UUID) to every request. Ship JSON logs to CloudWatch.
+
+H6. Audit Trail
+  Add audit_logs table:
+    (id, tenant_id, user_id, action, entity_type, entity_id,
+     before_json, after_json, ip_address, timestamp)
+  Log all admin actions, user deletions, content moderation events.
+
+H7. Server-Side Upload Virus Scanning
+  Integrate node-clamscan or S3 + Lambda + ClamAV.
+  All user uploads must be scanned before being served.
+
+
+NICE-TO-HAVE
+-------------
+  - GraphQL API layer (not needed for September)
+  - LLM response streaming via Server-Sent Events
+  - Webhook delivery system for tenant integrations
+
+
+================================================================================
+SECTION 5: DATABASE ROADMAP
+================================================================================
+
+Strategy: Stay on Shared PostgreSQL with tenant_id RLS for the pilot.
+Migrate to Aurora PostgreSQL when approaching 50K users or 10+ tenants.
+
+
+CRITICAL
+---------
+
+C1. Formal Migration System
+  Replace ensureXSchema.js as primary evolution mechanism with sequelize-cli
+  migrations. Keep ensureXSchema.js as safety net only.
+  Migration naming: YYYYMMDDHHMMSS-description.js
+  Benefits: ordered execution, rollback scripts, migration history table, CI enforcement.
+
+C2. Add Missing Composite Indexes
+  -- Feed (highest traffic)
+  CREATE INDEX CONCURRENTLY idx_posts_tenant_created
+    ON posts(tenant_id, created_at DESC);
+  CREATE INDEX CONCURRENTLY idx_notifications_user_created
+    ON notifications(user_id, created_at DESC);
+
+  -- Network
+  CREATE INDEX CONCURRENTLY idx_connections_tenant_user
+    ON connections(tenant_id, user_id);
+  CREATE INDEX CONCURRENTLY idx_follows_follower
+    ON follows(follower_id, created_at DESC);
+
+  -- Jobs
+  CREATE INDEX CONCURRENTLY idx_jobs_tenant_status
+    ON job_posts(tenant_id, status, created_at DESC);
+  CREATE INDEX CONCURRENTLY idx_applications_user
+    ON job_applications(applicant_id, created_at DESC);
+
+  -- Messages
+  CREATE INDEX CONCURRENTLY idx_messages_conversation
+    ON messages(conversation_id, created_at DESC);
+
+C3. Enable RLS Policies on All Tables
+  ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY posts_tenant_isolation ON posts
+    USING (tenant_id::text = current_setting('app.current_tenant_id', true)
+      OR current_setting('app.bypass_rls', true) = 'true');
+  Apply to all 67 tables.
+
+
+HIGH PRIORITY
+--------------
+
+H1. Read Replica
+  Add one RDS read replica. Route all SELECT queries in Sequelize to the replica.
+
+H2. Connection Pooler (PgBouncer)
+  With 3–6 ECS tasks × 20 connections = 60–120 connections to RDS.
+  PgBouncer in transaction pooling mode reduces connection count by 80%.
+
+H3. Automated Backups & PITR
+  Enable RDS automated backups with 7-day retention.
+  Enable Point-In-Time Recovery.
+  Test restore quarterly.
+
+H4. Query Performance Monitoring
+  Enable pg_stat_statements.
+  Connect AWS Performance Insights or pganalyze.
+  CloudWatch alarm for queries > 1 second P95.
+
+
+Multi-Tenant Data Retention Policy:
+-------------------------------------
+  User-deleted content     → soft-delete → hard-delete after 30 days
+  Tenant offboarded        → export + archive to S3 Glacier → delete after 90 days
+  Audit logs               → retain 2 years (compliance)
+  Notification logs        → retain 90 days
+  AI interview results     → retain 1 year or per tenant config
+
+
+================================================================================
+SECTION 6: AWS INFRASTRUCTURE ROADMAP
+================================================================================
+
+PHASE 1 — Pilot Launch (~$257–320/month)
+-----------------------------------------
+
+Architecture:
+  Internet
+    ↓
+  Route 53 (vidhyalayhub.com, *.vidhyalayhub.com)
+    ↓
+  CloudFront Distribution
+    ├── /api/*  → ALB origin (backend API)
+    └── /*      → S3 bucket origin (React SPA)
+                └── /media/*  → S3 uploads bucket
+    ↓ (API path)
+  ALB (HTTPS, ACM certificate, HTTP→HTTPS redirect)
+    ↓
+  ECS Fargate Service
+    ├── Task 1 (0.5 vCPU, 1GB RAM)
+    └── Task 2 (0.5 vCPU, 1GB RAM)
+    Auto-scaling: 2 min → 6 max (target CPU 65%)
+    ↓
+  RDS PostgreSQL db.t3.medium (Single-AZ for pilot)
+  + ElastiCache Redis t3.micro (JWT denylist + feed cache)
+    ↓
+  S3 Bucket (uploads/avatars/covers/library)
+    ↓
+  SQS Queue → Lambda (async OpenAI LLM calls, 60s timeout)
+
+Cost Breakdown (Phase 1):
+  Service              Config                        Est. Monthly
+  -------              ------                        ------------
+  ECS Fargate          2 tasks × 0.5vCPU/1GB        ~$30
+  RDS PostgreSQL       db.t3.medium, Single-AZ       ~$65
+  ElastiCache Redis    cache.t3.micro                ~$15
+  ALB                  1 load balancer               ~$20
+  CloudFront           10TB data transfer            ~$40
+  S3                   500GB storage + transfer      ~$25
+  Lambda               AI interview processing       ~$5
+  SQS                  AI job queue                  ~$1
+  Route 53             1 hosted zone                 ~$1
+  NAT Gateway          1 AZ                          ~$35
+  ACM                  TLS certificate               Free
+  CloudWatch           Logs + metrics                ~$20
+  TOTAL                                              ~$257–320/month
+
+
+PHASE 2 — Growth (10K–50K users, ~$1,800–2,800/month)
+---------------------------------------------------------
+
+Architecture:
+  Route 53 → CloudFront → ALB
+    → ECS Fargate (4–12 tasks, 1vCPU/2GB, Spot 40% mix)
+    → Aurora PostgreSQL
+       ├── Writer: db.r6g.large
+       └── Read Replica × 2: db.r6g.large
+    → PgBouncer (connection pooler, ECS sidecar)
+    → ElastiCache Redis r6g.large (3-node cluster)
+    → S3 (multi-prefix: /uploads, /media, /avatars, /library)
+    → SQS → Lambda (LLM, email, notification fan-out)
+    → API Gateway WebSocket → Lambda (real-time notifications)
+    → SES (transactional email)
+
+
+PHASE 3 — Enterprise (50K+ users, Multi-Region)
+--------------------------------------------------
+
+Architecture:
+  Route 53 Latency Routing → CloudFront (Global)
+    ↓ (per region: ap-south-1 primary, ap-southeast-1 DR)
+  ALB → ECS Fargate (10–40 tasks, c6g.large, Spot 60%)
+    → Aurora PostgreSQL Global Database (1 primary + 2 read replicas)
+    → ElastiCache Redis Global Datastore
+    → S3 Cross-Region Replication
+    → SQS + SNS + Lambda (event fan-out)
+    → API Gateway WebSocket (real-time)
+    → SES + Pinpoint (email + push)
+    → OpenSearch (full-text search)
+    → Kinesis Data Streams (analytics pipeline)
+
+  Phase 3 Monthly: ~$4,000–8,000 (scales with tenants)
+
+
+Infrastructure as Code: AWS CDK (TypeScript)
+---------------------------------------------
+Day 1 CDK stacks:
+  1. NetworkStack   — VPC, subnets, security groups, NAT gateway
+  2. DatabaseStack  — RDS, Redis, parameter groups, subnet groups
+  3. ComputeStack   — ECS cluster, task definitions, ALB, auto-scaling
+  4. StorageStack   — S3 buckets, CloudFront distribution, OAC
+  5. PipelineStack  — CodePipeline, CodeBuild, ECR repository
+
+
+================================================================================
+SECTION 7: DEVOPS & RELEASE STRATEGY
+================================================================================
+
+CI/CD Pipeline (Must build before launch)
+-------------------------------------------
+GitHub Actions workflow on push to main:
+  1. Lint (ESLint frontend + backend)
+  2. Unit tests (Vitest)
+  3. Build Docker image → push to ECR
+  4. Deploy to Staging (ECS rolling update)
+  5. Run Playwright smoke tests against staging
+  6. (Manual approval gate for production)
+  7. Deploy to Production (ECS rolling update, 25% at a time)
+  8. CloudWatch alarm check (5 min post-deploy)
+  9. Slack/email notification
+
+
+Environment Strategy:
+  Environment    Trigger           Database               Purpose
+  -----------    -------           --------               -------
+  local          Developer machine Local Docker Postgres  Development
+  staging        Push to main      RDS staging (separate) Integration testing
+  production     Manual approval   RDS production         Live
+
+  Never deploy directly to production without staging validation.
+
+
+Feature Flag Strategy:
+  Environment-based flags stored in tenant_settings JSONB and process.env.FEATURE_*:
+    FEATURE_AI_INTERVIEW=true
+    FEATURE_COMMUNITIES=true
+    FEATURE_RESOURCE_LIBRARY=true
+  Per-tenant flags override global flags.
+
+
+Rollback Strategy:
+  - ECS rolling deploy: always keep 1 previous task definition registered
+  - Database: never run destructive migrations without a prior snapshot
+  - Rollback command: aws ecs update-service --task-definition <previous-revision>
+  - All migration files must have a down() rollback function
+
+
+Monitoring & Alerting (CloudWatch Alarms):
+  Metric                     Threshold              Action
+  ------                     ---------              ------
+  ALB 5xx Error Rate         > 1% for 5 min         PagerDuty + Slack
+  ECS CPU Utilization        > 80% for 10 min       Scale out + alert
+  RDS CPU                    > 70%                  Alert + investigate
+  RDS Free Storage           < 10GB                 Alert
+  RDS Connections            > 80% of max           Alert
+  P95 API Latency            > 500ms                Alert
+  Lambda Error Rate          > 5%                   Alert
+  Redis Memory               > 80%                  Alert
+
+
+================================================================================
+SECTION 8: PRODUCT LAUNCH ROADMAP
+================================================================================
+
+PHASE 1: Architecture Stabilization — Weeks 1–3 (June)
+--------------------------------------------------------
+Goal: Fix all critical bugs. Zero regressions. Safe to deploy.
+
+  Task                                              Owner        Effort
+  ----                                              -----        ------
+  Fix db/config.js dev pool (acquire:30000)         Backend      1h
+  Enforce JWT_SECRET validation at startup          Backend      2h
+  Set STORAGE_PROVIDER=s3 in prod config            DevOps       2h
+  SKIP_SEQUELIZE_SYNC=true + migration runner       Backend      4h
+  Add composite DB indexes                          Backend/DB   1 day
+  Enable ENABLE_TENANT_RLS=true in staging          Backend      4h
+  Build GitHub Actions CI pipeline                  DevOps       2 days
+  Set up ECR + ECS staging environment              DevOps       2 days
+  Move LLM calls to SQS + Lambda (async)            Backend      3 days
+
+Deliverables: Zero critical bugs. CI pipeline live. Staging environment running.
+
+
+PHASE 2: SaaS Foundation — Weeks 4–6 (late June – early July)
+---------------------------------------------------------------
+Goal: Properly multi-tenant, secure, and horizontally scalable.
+
+  Task                                              Owner        Effort
+  ----                                              -----        ------
+  Add refresh token + JWT revocation (Redis)        Backend      3 days
+  Enable ContentSecurityPolicy headers              Backend      1 day
+  Add ElastiCache Redis                             Backend/DevOps 2 days
+  Tenant provisioning automation (invite flow)      Backend      3 days
+  Add tenant_settings JSONB + feature flags         Backend      2 days
+  URL-based routing via react-router-dom            Frontend     3 days
+  Route-based code splitting (lazy + Suspense)      Frontend     2 days
+  Error boundaries at route level                   Frontend     1 day
+  React Query consistent adoption                   Frontend     3 days
+  Tenant branding pipeline                          Frontend     2 days
+  Add audit_log table + log admin actions           Backend      2 days
+
+Deliverables: Auth hardened. Frontend has real URLs. Platform multi-tenant secure.
+
+
+PHASE 3: Performance & Security — Weeks 7–9 (July)
+----------------------------------------------------
+Goal: Platform handles 10K+ concurrent users without degradation.
+
+  Task                                              Owner        Effort
+  ----                                              -----        ------
+  AWS CDK infrastructure-as-code                    DevOps       3 days
+  Deploy to production ECS Fargate (2 tasks)        DevOps       1 day
+  Configure CloudFront (SPA + S3 media)             DevOps       1 day
+  RDS PostgreSQL production + PITR                  DevOps       1 day
+  PgBouncer connection pooler                       DevOps       1 day
+  Feed/notification cache with Redis                Backend      2 days
+  Server-side upload virus scanning                 Backend      2 days
+  Add S3 signed URLs for private media              Backend      1 day
+  Structured logging + CloudWatch JSON shipping     Backend      2 days
+  Lighthouse performance audit + fixes              Frontend     2 days
+  Mobile responsiveness pass                        Frontend     2 days
+  Add pg_stat_statements + Performance Insights     DB           1 day
+
+Deliverables: Production infrastructure live. Performance baselines established.
+
+
+PHASE 4: QA & Load Testing — Weeks 10–11 (August)
+---------------------------------------------------
+Goal: Prove platform handles pilot load. Zero data leakage between tenants.
+
+  Task                                              Owner        Effort
+  ----                                              -----        ------
+  Playwright E2E test suite (all critical paths)    QA/Frontend  5 days
+  Tenant isolation penetration test                 Security     2 days
+  Load test with k6 (500 concurrent, 10 tenants)   DevOps       2 days
+  Database query audit (EXPLAIN ANALYZE top-20)    DB           2 days
+  API fuzzing (OWASP ZAP scan)                     Security     1 day
+  Fix all issues found in testing                   All          3 days
+  Disaster recovery drill (restore from snapshot)   DevOps       1 day
+
+Pass/Fail Criteria:
+  - P95 API response < 500ms under 500 concurrent users
+  - Zero cross-tenant data visible in any test
+  - Zero critical OWASP issues
+  - RDS restore < 15 minutes
+
+
+PHASE 5: Production Readiness — Week 12 (late August)
+------------------------------------------------------
+Goal: All systems go for launch.
+
+  Task                                              Owner        Effort
+  ----                                              -----        ------
+  CloudWatch alarms + PagerDuty integration         DevOps       1 day
+  Production deploy with blue/green cutover         DevOps       1 day
+  First-college data import + user onboarding       Product      2 days
+  Runbook documentation (incident response)         DevOps       1 day
+  Admin training sessions                           Product      1 day
+  Legal review (privacy policy, DPA)                Legal        external
+  Final security sign-off                           CTO          1 day
+
+
+PHASE 6: Launch — September Week 1
+------------------------------------
+  - Soft launch with first pilot college (restricted users)
+  - Monitor CloudWatch dashboards for 48 hours
+  - Daily standups on platform stability for 2 weeks
+  - Collect feedback from pilot admins + students
+  - Plan Phase 2 onboarding of 2nd and 3rd colleges
+
+
+================================================================================
+SECTION 9: PRODUCTION READINESS CHECKLIST
+================================================================================
+
+FRONTEND
+---------
+  [ ] URL-based routing implemented (react-router-dom)
+  [ ] Route-based code splitting enabled (initial bundle < 200KB gzip)
+  [ ] Error boundaries on all routes
+  [ ] All pages mobile-responsive (Lighthouse score >= 70)
+  [ ] React Query used consistently for all server state
+  [ ] Tenant branding variables applied from context
+  [ ] Skeleton loaders on all list views
+  [ ] All forms have validation (react-hook-form + zod)
+  [ ] Accessibility: ARIA labels on icon-only buttons, focus rings visible
+  [ ] Environment variables validated at build time
+  [ ] Playwright E2E tests cover all critical user journeys
+
+BACKEND
+--------
+  [ ] db/config.js dev pool fixed (acquire: 30000)
+  [ ] JWT_SECRET non-default enforced at startup
+  [ ] Refresh token + access token flow implemented
+  [ ] JWT revocation via Redis denylist
+  [ ] SKIP_SEQUELIZE_SYNC=true in production
+  [ ] Migration runner executes ensureXSchema once on deploy
+  [ ] ENABLE_TENANT_RLS=true in production
+  [ ] STORAGE_PROVIDER=s3 in production
+  [ ] LLM calls async via SQS + Lambda
+  [ ] ContentSecurityPolicy enabled in Helmet
+  [ ] Structured JSON logging with correlation_id shipped to CloudWatch
+  [ ] Audit log table capturing all admin/destructive actions
+  [ ] Upload virus scanning in place
+  [ ] Health check does not leak env details in production
+  [ ] Rate limiting tuned per-route (auth endpoints: 10/min)
+  [ ] API versioning in place (/api/v1/)
+
+DATABASE
+---------
+  [ ] Composite indexes on all high-traffic query patterns
+  [ ] PostgreSQL RLS policies on all 67 tables
+  [ ] Formal migration system (sequelize-cli migrations/)
+  [ ] Read replica configured and routing reads
+  [ ] PgBouncer in transaction mode
+  [ ] pg_stat_statements enabled
+  [ ] RDS automated backups (7-day retention)
+  [ ] Point-In-Time Recovery tested (restore drill completed)
+  [ ] Performance Insights enabled
+  [ ] No orphaned records (FK constraints consistent)
+  [ ] Soft-delete pattern consistent across all entities
+
+SECURITY
+---------
+  [ ] JWT_SECRET is 256-bit random, stored in AWS Secrets Manager
+  [ ] All secrets in AWS Secrets Manager (no .env in production)
+  [ ] ContentSecurityPolicy headers enabled
+  [ ] CORS locked to known origins (no wildcard *)
+  [ ] HTTPS enforced (HTTP → HTTPS redirect at ALB)
+  [ ] S3 bucket: public access blocked; CloudFront OAC for private media
+  [ ] VPC: ECS tasks and RDS in private subnets only
+  [ ] Security groups: RDS only accessible from ECS security group
+  [ ] OWASP ZAP scan completed, all Critical/High issues resolved
+  [ ] Admin portal requires MFA
+  [ ] npm audit: no High/Critical vulnerabilities
+  [ ] No API keys or secrets in frontend bundle
+
+AWS INFRASTRUCTURE
+-------------------
+  [ ] ECS Fargate service with 2-task minimum
+  [ ] ALB with HTTPS listener, ACM certificate
+  [ ] CloudFront distribution for SPA + S3 media
+  [ ] RDS PostgreSQL with Multi-AZ
+  [ ] ElastiCache Redis cluster
+  [ ] SQS queues for async processing
+  [ ] Lambda for LLM + notification jobs
+  [ ] S3 bucket with lifecycle policies
+  [ ] VPC with public/private subnet architecture
+  [ ] NAT Gateway for private subnet egress
+  [ ] All resources tagged (project, environment, tenant)
+  [ ] AWS Cost Budget alerts configured
+
+MONITORING & LOGGING
+---------------------
+  [ ] CloudWatch alarms on 5xx rate, CPU, latency, DB connections
+  [ ] PagerDuty or equivalent on-call routing
+  [ ] CloudWatch Logs Insights dashboards for error investigation
+  [ ] Structured JSON logs with correlation_id, tenant_id, user_id
+  [ ] API response time tracking (P50, P95, P99)
+  [ ] Slack #alerts channel receiving CloudWatch alarm notifications
+  [ ] RDS Performance Insights enabled
+  [ ] ECS Container Insights enabled
+
+PERFORMANCE
+------------
+  [ ] k6 load test: 500 concurrent users, P95 < 500ms
+  [ ] Database: EXPLAIN ANALYZE on top-20 queries, no sequential scans
+  [ ] Redis cache hit rate > 70% for feed queries
+  [ ] Frontend Lighthouse: Performance >= 70, Accessibility >= 80
+  [ ] CloudFront cache hit rate > 80% for static assets
+
+MULTI-TENANCY
+--------------
+  [ ] Tenant isolation verified: Tenant A cannot read Tenant B data
+  [ ] RLS policies tested for all 67 tables
+  [ ] Tenant provisioning flow works end-to-end (< 5 minutes)
+  [ ] Per-tenant feature flags working
+  [ ] Per-tenant branding applied (logo, colors)
+  [ ] Tenant offboarding flow: data export + deletion
+
+COMPLIANCE
+-----------
+  [ ] Privacy policy published and linked from login page
+  [ ] Data Processing Agreement template ready for institutions
+  [ ] User data export endpoint (GDPR Article 20)
+  [ ] User data deletion endpoint (GDPR Article 17)
+  [ ] Audit logs retained for 2 years
+  [ ] No PII in application logs
+
+BACKUP & RECOVERY
+------------------
+  [ ] RDS automated backup tested (restore to new instance completed)
+  [ ] S3 versioning enabled on uploads bucket
+  [ ] ECS task definitions versioned in ECR
+  [ ] CDK infrastructure code in Git (can rebuild from scratch)
+  [ ] Runbook documented: DB restore, ECS rollback, Redis flush, secret rotation
+
+
+================================================================================
+SECTION 10: EXECUTIVE SUMMARY
+================================================================================
+
+TOP 10 RISKS BEFORE LAUNCH
+-----------------------------
+  #   Risk                                          Current State         Fix By
+  --  ----                                          -------------         ------
+  1   Dev DB pool 30-min locks — silent hangs        db/config.js hardcoded  Week 1
+  2   No CI/CD — broken code ships to prod           Zero pipelines          Week 2
+  3   JWT_SECRET default used in production          No startup check        Week 1
+  4   Synchronous LLM calls block event loop         All AI calls sync       Week 3
+  5   Local disk storage breaks scaling              STORAGE_PROVIDER=local  Week 1
+  6   No URL routing — core UX broken, 0% SEO        State-driven nav        Week 4
+  7   No token revocation — stolen JWT valid 7 days  No denylist             Week 5
+  8   No composite indexes — full-scan at scale      Missing indexes         Week 1
+  9   RLS disabled — cross-tenant data exposure      ENABLE_TENANT_RLS off   Week 2
+  10  No automated testing — regressions undetected  Manual only             Week 2
+
+
+TOP 10 ARCHITECTURE IMPROVEMENTS
+----------------------------------
+  1.  URL routing — switch to react-router-dom; every feature needs a shareable URL
+  2.  Async LLM processing — SQS + Lambda eliminates the biggest latency risk
+  3.  Formal migration system — replace ensureXSchema with sequelize-cli migrations
+  4.  Redis for JWT denylist + feed cache — fixes security hole + perf bottleneck
+  5.  Refresh token flow — 7-day unrevocable JWT too dangerous for educational platform
+  6.  Infrastructure as Code (CDK) — reproducible, version-controlled infrastructure
+  7.  Read replica routing — separate read vs. write DB connections from day 1
+  8.  PgBouncer — prevents connection exhaustion under ECS auto-scaling
+  9.  React Query adoption — structured server state, automatic cache invalidation
+  10. ContentSecurityPolicy — most impactful single-line security improvement
+
+
+TOP 10 SCALABILITY IMPROVEMENTS
+---------------------------------
+  1.  Redis cache for feed, notifications, user profiles (TTL: 30s feed, 5min profiles)
+  2.  Composite (tenant_id, created_at DESC) indexes on all list-query tables
+  3.  Route all SELECT queries to RDS read replica
+  4.  Move LLM/email/notification fan-out to SQS workers — never in request thread
+  5.  ECS auto-scaling: scale out at 65% CPU, scale in at 30%
+  6.  CloudFront in front of SPA and S3 media — serve static assets from edge
+  7.  Route-based code splitting — reduce initial JS from 538KB to < 200KB gzip
+  8.  PgBouncer transaction pooling — 10x more concurrent users, same RDS instance
+  9.  S3 multipart upload for large files (library resources, video posts)
+  10. Lazy-load heavy React components (AIInterview, AdminDashboard, Communities)
+
+
+TOP 10 SECURITY IMPROVEMENTS
+------------------------------
+  1.  Enforce non-default JWT_SECRET at startup — process.exit(1) if default
+  2.  Move all secrets to AWS Secrets Manager — no .env files in production
+  3.  Enable ContentSecurityPolicy in Helmet — prevents XSS attack class
+  4.  Add refresh tokens + JWT revocation Redis denylist
+  5.  Enable PostgreSQL RLS on all 67 tables — hard tenant isolation at DB level
+  6.  Lock CORS to explicit ALLOWED_ORIGINS — no wildcard in production
+  7.  Server-side virus scanning on all user uploads
+  8.  Rate limit auth endpoints to 10 req/min — brute force protection
+  9.  S3 private bucket + CloudFront signed URLs — no public media URLs
+  10. MFA requirement for college admin portal accounts
+
+
+TOP 10 COST OPTIMIZATION OPPORTUNITIES
+----------------------------------------
+  1.  ECS Fargate Spot — 40–60% Spot tasks for non-critical workloads; save 50–70%
+  2.  RDS Reserved Instances — 1-year reserved saves ~38% vs on-demand
+  3.  ElastiCache Reserved — 1-year reserved saves ~35%
+  4.  S3 Intelligent-Tiering — moves infrequent uploads to cheaper storage; saves 40–60%
+  5.  Lambda for async jobs — pay-per-invocation vs always-on worker ($5/mo vs $40+)
+  6.  CloudFront cache — >80% hit ratio means 80% of bandwidth served from edge free
+  7.  Single NAT Gateway — 1 NAT GW vs 1 per AZ; saves $30/month at pilot scale
+  8.  AWS Cost Tags from day 1 — tag by tenant/environment/feature; find waste early
+  9.  Right-size RDS after 30 days — start db.t3.medium; check actual utilization first
+  10. CloudWatch Log retention — 30-day app logs, 90-day access logs; prevent runaway cost
+
+
+THE ONE-PAGE SEPTEMBER LAUNCH PLAN
+------------------------------------
+  June  Weeks 1–3    Fix critical bugs → CI/CD pipeline → Staging on AWS
+  June  Weeks 4–6    Auth hardening → Redis → React Router → SaaS foundation
+  July  Weeks 7–9    Production infra → Performance → Security → CDK
+  August Weeks 10–11  Load testing → Pen testing → E2E tests → Fixes
+  August Week 12      Production deploy → Pilot onboarding → Monitoring live
+  September Week 1    Soft launch with first college → Monitor 48h → Iterate
+
+Minimum team to execute this safely:
+  - 1 full-stack engineer (backend focus)
+  - 1 frontend engineer
+  - 1 DevOps/SRE engineer (part-time through Phase 1–2, full-time Phase 3+)
+  - 1 QA engineer (Phase 4)
+
+The September deadline is achievable.
+Critical path: DB fix → CI/CD → Staging → Async LLM → Auth hardening →
+               Production infra → Load test → Launch.
+
+Every item in the Critical tier MUST be done before a production URL
+is opened to real users.
+
+================================================================================
+END OF DOCUMENT
+================================================================================

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="wacstg.das.myatos.net">
+  <md:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        <ds:X509Data>
+          <ds:X509Certificate>MIIEWDCCA0CgAwIBAgIUO9BQFADfH0d3Ww3eS+aNw/cWz/owDQYJKoZIhvcNAQELBQAwgaExCzAJBgNVBAYTAlBMMRAwDgYDVQQIDAdLVUotUE9NMQwwCgYDVQQHDANCWUQxDTALBgNVBAoMBEFUT1MxETAPBgNVBAsMCERBUzItV0FDMScwJQYDVQQDDB5BdG9zIFJvb3QgQ0EgMjAyMCBmb3IgREFTMi1XQUMxJzAlBgkqhkiG9w0BCQEWGGRhcy13YWMtc3VwcG9ydEBhdG9zLm5ldDAeFw0yMDAxMTQxMTE1NDdaFw0zMDAxMTExMTE1NDdaMIGfMQswCQYDVQQGEwJQTDEQMA4GA1UECAwHS1VKLVBPTTEMMAoGA1UEBwwDQllEMQ0wCwYDVQQKDARBVE9TMREwDwYDVQQLDAhEQVMyLVdBQzElMCMGA1UEAwwcc2FtbDIwMjBfMjAzMC1kZXYubXlhdG9zLm5ldDEnMCUGCSqGSIb3DQEJARYYZGFzLXdhYy1zdXBwb3J0QGF0b3MubmV0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvAWvLKEVl4bg+OC7TsLnEwyEBn4ADh12xWgVY8wSw863tnPs98xLlFJXqccqi4uXwf0uMi8HaajdDlAKcchzNzYqydQXlwI49jSuvtcTKFnNdg+Wj13E9B9dQg27Z88xNw1mhZBIVaLLkKLrVWgsKrto2YMQrNcNkQNiR/P22rzXjtw40JYRkdS20K9XsNMHgNYS3u4wvmFmoaRS8jVBwtUmvkZsZE0nzwYlpbP2bwvhWYFc4Ei38XXa9IM178IwfB66dfu1VsBgAon70PDZevUituVId/90dcmM8oNtRVRGlq8F4kTnUygp3jc0Vp2D2HMgI54e3KZS3qnKwfJJrwIDAQABo4GHMIGEMAkGA1UdEwQCMAAwCwYDVR0PBAQDAgSwMDEGA1UdJQQqMCgGCCsGAQUFBwMBBggrBgEFBQcDAgYIKwYBBQUHAwMGCCsGAQUFBwMIMDcGA1UdEQQwMC6CFXdhY3N0Zy5kYXMubXlhdG9zLm5ldIIVd2FjdHN0LmRhcy5teWF0b3MubmV0MA0GCSqGSIb3DQEBCwUAA4IBAQBirV+HAJcWjJ9Xttpy3s0Q9LRho6KBlqU9XQl6WhOxUJOJrlRdEQ/ktcaKt6KxtJJec4TwgKhaAWOVKcOntmBhco8zJoiCALboFpRwXjdVV4lFUUPzAGCRIWdtTVMLUgNbsFDZGK/Qu1MeVbVhARHNp+nlhXUobfpULU8dpv3N8+KJYVnmUEGawB4YJX+jkB4UeDwoxEW1Oow8nCugcmWlN7iRXeLkfdz3HReg6I82HJD0h9XEyAcZ+ZldVYCPRYjmGp0ulxKQVeN/VQFDgad6ggCc0gkOvclWNU863eY0yOyKdt57ZOGq35YfvNz/KaP4dgXxkfMgp3/FGi4as3Ji</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"     Location="https://wacstg.das.myatos.net/sso_cond2fa_256/SingleSignOnService"/>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://wacstg.das.myatos.net/sso_cond2fa_256/SingleSignOnService"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://wacstg.das.myatos.net/portal/logout_confirm.jsp"/>
+  </md:IDPSSODescriptor>
+</md:EntityDescriptor>

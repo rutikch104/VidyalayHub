@@ -1,0 +1,381 @@
+================================================================================
+                    EDUCATIONAL PLATFORM API ENDPOINTS REFERENCE
+================================================================================
+
+AUTHENTICATION: All APIs require JWT token in Authorization header
+Authorization: Bearer your_jwt_token_here
+
+================================================================================
+1. POST APIs
+================================================================================
+
+1.1 CREATE POST
+POST /api/posts
+Content-Type: multipart/form-data
+
+Body:
+- content: "I just finished my final year project on machine learning! It was challenging but rewarding. Anyone else working on ML projects?"
+- hashtags: ["machine-learning", "final-year", "projects", "ai"]
+- type: "text"
+- visibility: "public"
+- mentioned_users: ["550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"]
+- media: [files] (up to 5 files)
+
+Example with different types:
+- type: "code", code_language: "python"
+- type: "question", content: "How to implement neural networks from scratch?"
+- type: "update", content: "New course materials uploaded for Data Structures"
+
+1.2 CREATE RESOURCE (LIBRARY)
+POST /api/resources
+Content-Type: multipart/form-data
+
+Body:
+- title: "Advanced Machine Learning Algorithms"
+- description: "Comprehensive guide covering SVM, Random Forest, and Deep Learning concepts"
+- tags: ["machine-learning", "algorithms", "tutorial"]
+- is_public: "true"
+- allowed_roles: ["student", "teacher"]
+- file: [file] (single file)
+
+1.3 CREATE QUESTION (Q&A)
+POST /api/questions
+Content-Type: multipart/form-data
+
+Body:
+- title: "How to implement a binary search tree in Java?"
+- description: "I'm learning data structures and need help with BST implementation. Can someone explain the insertion and deletion logic?"
+- tags: ["java", "data-structures", "binary-search-tree", "algorithms"]
+- is_anonymous: "false"
+- mentioned_users: ["550e8400-e29b-41d4-a716-446655440003", "550e8400-e29b-41d4-a716-446655440004"]
+- attachments: [files] (up to 5 files)
+
+1.4 ADD ANSWER
+POST /api/questions/{question_id}/answers
+Content-Type: multipart/form-data
+
+Body:
+- content: "Here's a step-by-step implementation of BST in Java:\n\n1. First, create a Node class...\n2. Implement insertion method...\n3. Handle deletion cases...\n\nLet me know if you need clarification on any part!"
+- attachments: [files] (up to 5 files)
+
+1.5 ADD COMMENT TO QUESTION
+POST /api/questions/{question_id}/comments
+Content-Type: application/json
+
+Body:
+{
+    "text": "Great question! I had the same issue when learning BST. The key is understanding the recursive nature of tree operations."
+}
+
+1.6 ADD COMMENT TO POST
+POST /api/posts/{post_id}/comment
+Content-Type: application/json
+
+Body:
+{
+    "text": "Congratulations on completing your ML project! What was the most challenging part?"
+}
+
+1.7 CREATE BOOKMARK
+POST /api/bookmarks
+Content-Type: application/json
+
+Body:
+{
+    "type": "question",
+    "type_id": "550e8400-e29b-41d4-a716-446655440005"
+}
+
+1.8 SEND MESSAGE
+POST /api/messages
+Content-Type: application/json
+
+Body:
+{
+    "thread_id": "550e8400-e29b-41d4-a716-446655440006",
+    "receiver_id": "550e8400-e29b-41d4-a716-446655440007",
+    "message": "Hi! I saw your question about BST. I can help you with that if you'd like.",
+    "media_url": "optional_media_url"
+}
+
+1.9 CREATE MESSAGE THREAD
+POST /api/messages/thread
+Content-Type: application/json
+
+Body:
+{
+    "user2_id": "550e8400-e29b-41d4-a716-446655440008"
+}
+
+================================================================================
+2. GET APIs
+================================================================================
+
+2.1 GET POSTS
+GET /api/posts?page=1&limit=10&type=text&hashtag=machine-learning&user_id=550e8400-e29b-41d4-a716-446655440009&visibility=public
+
+2.2 GET SINGLE POST
+GET /api/posts/550e8400-e29b-41d4-a716-446655440010
+
+2.3 GET POST COMMENTS
+GET /api/posts/550e8400-e29b-41d4-a716-446655440010/comments?page=1&limit=10
+
+2.4 GET RESOURCES
+GET /api/resources?page=1&limit=10&search=machine+learning&tags=algorithms&tenant_id=550e8400-e29b-41d4-a716-446655440011&is_public=true
+
+2.5 GET SINGLE RESOURCE
+GET /api/resources/550e8400-e29b-41d4-a716-446655440012
+
+2.6 GET POPULAR TAGS (RESOURCES)
+GET /api/resources/tags/popular
+
+2.7 GET QUESTIONS
+GET /api/questions?page=1&limit=10&search=binary+search+tree&tags=java&answered=true&user_id=550e8400-e29b-41d4-a716-446655440013
+
+2.8 GET SINGLE QUESTION
+GET /api/questions/550e8400-e29b-41d4-a716-446655440014
+
+2.9 GET USER BOOKMARKS
+GET /api/bookmarks
+
+2.10 GET BOOKMARKS BY TYPE
+GET /api/bookmarks/question
+
+2.11 CHECK IF BOOKMARKED
+GET /api/bookmarks/check?type=question&type_id=550e8400-e29b-41d4-a716-446655440015
+
+2.12 GET MESSAGE THREADS
+GET /api/messages/threads
+
+2.13 GET THREAD MESSAGES
+GET /api/messages/threads/550e8400-e29b-41d4-a716-446655440016
+
+2.14 GET UNREAD MESSAGE COUNT
+GET /api/messages/unread-count
+
+================================================================================
+3. PUT APIs
+================================================================================
+
+3.1 UPDATE POST
+PUT /api/posts/550e8400-e29b-41d4-a716-446655440010
+Content-Type: multipart/form-data
+
+Body:
+- content: "Updated: I just finished my final year project on machine learning! It was challenging but rewarding. Anyone else working on ML projects? I'm particularly interested in computer vision applications."
+- hashtags: ["machine-learning", "final-year", "projects", "ai", "computer-vision"]
+- type: "text"
+- visibility: "public"
+- mentioned_users: ["550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"]
+- media: [files] (up to 5 files)
+
+3.2 UPDATE RESOURCE
+PUT /api/resources/550e8400-e29b-41d4-a716-446655440012
+Content-Type: multipart/form-data
+
+Body:
+- title: "Advanced Machine Learning Algorithms - Updated Edition"
+- description: "Comprehensive guide covering SVM, Random Forest, Deep Learning, and the latest Transformer models"
+- tags: ["machine-learning", "algorithms", "tutorial", "deep-learning", "transformers"]
+- is_public: "true"
+- allowed_roles: ["student", "teacher", "researcher"]
+- file: [file] (optional)
+
+================================================================================
+4. DELETE APIs
+================================================================================
+
+4.1 DELETE POST
+DELETE /api/posts/550e8400-e29b-41d4-a716-446655440010
+
+4.2 DELETE RESOURCE
+DELETE /api/resources/550e8400-e29b-41d4-a716-446655440012
+
+4.3 DELETE BOOKMARK
+DELETE /api/bookmarks/550e8400-e29b-41d4-a716-446655440017
+
+4.4 DELETE MESSAGE
+DELETE /api/messages/550e8400-e29b-41d4-a716-446655440018
+
+================================================================================
+5. INTERACTION APIs
+================================================================================
+
+5.1 LIKE/UNLIKE POST
+POST /api/posts/550e8400-e29b-41d4-a716-446655440010/like
+
+5.2 LIKE/UNLIKE QUESTION
+POST /api/questions/550e8400-e29b-41d4-a716-446655440014/like
+
+================================================================================
+6. ADMIN APIs
+================================================================================
+
+6.1 GET ALL COLLEGES
+GET /api/admin/colleges
+
+6.2 GET PENDING COLLEGES
+GET /api/admin/colleges/pending
+
+6.3 GET COLLEGE DETAILS
+GET /api/admin/colleges/550e8400-e29b-41d4-a716-446655440011
+
+6.4 GET COLLEGE USERS
+GET /api/admin/colleges/550e8400-e29b-41d4-a716-446655440011/users
+
+6.5 APPROVE COLLEGE
+POST /api/admin/colleges/550e8400-e29b-41d4-a716-446655440011/approve
+
+6.6 REJECT COLLEGE
+POST /api/admin/colleges/550e8400-e29b-41d4-a716-446655440011/reject
+
+6.7 TOGGLE COLLEGE STATUS
+PUT /api/admin/colleges/550e8400-e29b-41d4-a716-446655440011/status
+Content-Type: application/json
+
+Body:
+{
+    "status": true
+}
+
+6.8 CREATE COLLEGE
+POST /api/admin/colleges
+Content-Type: application/json
+
+Body:
+{
+    "name": "Tech University of Innovation",
+    "email": "admin@techuniversity.edu",
+    "phone": "+1-555-0123",
+    "address": "123 Innovation Drive, Tech City, TC 12345",
+    "status": "pending"
+}
+
+================================================================================
+7. DUMMY DATA EXAMPLES
+================================================================================
+
+7.1 USER IDs (for testing)
+- Student: "550e8400-e29b-41d4-a716-446655440001"
+- Teacher: "550e8400-e29b-41d4-a716-446655440002"
+- Admin: "550e8400-e29b-41d4-a716-446655440003"
+- College: "550e8400-e29b-41d4-a716-446655440011"
+
+7.2 SAMPLE TAGS
+- Technical: ["javascript", "python", "java", "react", "nodejs", "mongodb"]
+- Academic: ["data-structures", "algorithms", "machine-learning", "web-development"]
+- General: ["projects", "tutorials", "resources", "help", "discussion"]
+
+7.3 SAMPLE CONTENT
+- Questions: "How to implement authentication in React?", "Best practices for database design?"
+- Posts: "Just completed my internship at Google!", "Looking for study partners for algorithms"
+- Resources: "Complete React Tutorial", "Database Design Patterns", "Machine Learning Basics"
+
+================================================================================
+8. TESTING SCENARIOS
+================================================================================
+
+8.1 BASIC FLOW
+1. Create a post with hashtags and mentions
+2. Add comments to the post
+3. Like the post
+4. Bookmark the post
+5. Update the post
+6. Delete the post
+
+8.2 Q&A FLOW
+1. Create a question with tags and teacher mentions
+2. Add an answer with attachments
+3. Add comments to the question
+4. Like the question
+5. Bookmark the question
+
+8.3 RESOURCE FLOW
+1. Upload a resource with tags
+2. Search for resources by tags
+3. Update resource details
+4. Delete the resource
+
+8.4 MESSAGING FLOW
+1. Create a message thread with another user
+2. Send messages back and forth
+3. Check unread count
+4. Delete messages
+
+8.5 ADMIN FLOW
+1. View all colleges
+2. Approve/reject pending colleges
+3. Toggle college status
+4. Create new college
+
+================================================================================
+9. COMMON RESPONSE FORMAT
+================================================================================
+
+Success Response:
+{
+    "status": true,
+    "message": "Operation completed successfully",
+    "data": { ... }
+}
+
+Error Response:
+{
+    "status": false,
+    "message": "Error description",
+    "error": "Detailed error message"
+}
+
+Pagination Response:
+{
+    "status": true,
+    "data": {
+        "items": [...],
+        "pagination": {
+            "total": 100,
+            "page": 1,
+            "pages": 10
+        }
+    }
+}
+
+================================================================================
+10. FILE UPLOAD SPECIFICATIONS
+================================================================================
+
+- Posts: field name "media", max 5 files
+- Resources: field name "file", max 1 file
+- Questions/Answers: field name "attachments", max 5 files
+- File size limit: 10MB per file
+- Supported types: images (jpg, png, gif), videos (mp4, mpeg), code files (txt, js, py, json)
+
+================================================================================
+11. TESTING TOOLS
+================================================================================
+
+Recommended tools for testing:
+1. Postman - For API testing with GUI
+2. Insomnia - Alternative to Postman
+3. curl - Command line testing
+4. Thunder Client - VS Code extension
+5. REST Client - VS Code extension
+
+================================================================================
+12. ERROR CODES
+================================================================================
+
+Common HTTP Status Codes:
+- 200: Success
+- 201: Created
+- 400: Bad Request
+- 401: Unauthorized
+- 403: Forbidden
+- 404: Not Found
+- 500: Internal Server Error
+
+================================================================================
+END OF REFERENCE
+================================================================================
+
+Note: Replace all UUIDs with actual IDs from your database when testing.
+Keep this file updated as you add new endpoints or modify existing ones. 

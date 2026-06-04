@@ -1,0 +1,48 @@
+{
+  "name": "educational_platform_backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node scripts/backendAudit.js",
+    "audit:backend": "node scripts/backendAudit.js",
+    "start": "nodemon server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "pm2:prod": "pm2 start ecosystem.config.js --env production",
+    "docker:build": "docker build -t vidhyalayhub-api .",
+    "docker:run": "docker run --env-file .env -p 3030:3030 vidhyalayhub-api",
+    "create-super-admin": "node scripts/createSuperAdminMainAdmin.js",
+    "create-super-admin-owner": "node scripts/createSuperAdminOwner.js",
+    "migrate": "node database/migrations/runMigrations.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rutikch104/educational_platform_backend.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rutikch104/educational_platform_backend/issues"
+  },
+  "homepage": "https://github.com/rutikch104/educational_platform_backend#readme",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "app-root-path": "^3.1.0",
+    "bcrypt": "^5.1.1",
+    "body-parser": "^2.2.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.2",
+    "nodemon": "^3.1.10",
+    "pg": "^8.15.6",
+    "sequelize": "^6.37.7",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0"
+  }
+}

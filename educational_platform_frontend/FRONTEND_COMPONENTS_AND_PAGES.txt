@@ -1,0 +1,215 @@
+================================================================================
+  PROJECT SPARKLE — FRONTEND INVENTORY (components + pages)
+  Path: project-sparkle/
+  Purpose: Read this file to plan enhancements one screen or one area at a time.
+================================================================================
+
+HOW NAVIGATION WORKS
+--------------------
+• Main shell: src/App.jsx
+• There is NO React Router for the logged-in app. Navigation uses React state:
+    currentPage (string) + setCurrentPage passed to Header and LeftSidebar.
+• Exception: When !user, the app shows Login or Register based on
+    window.location.pathname === '/register' (see App.jsx). /login is normalized to /.
+
+• Entry: src/main.jsx → App.jsx
+
+
+APPLICATION “PAGES” (logical screens)
+--------------------------------------
+These are the values of currentPage used in App.jsx switch / home layout.
+Use this list as your enhancement backlog order if you like.
+
+  currentPage        | Main component (file)                    | Notes
+  -------------------+------------------------------------------+---------------------------
+  home               | Feed (inline in App.jsx)                 | FeedTabs, CreatePost, PostCard list, RightSidebar
+  library            | LibraryCenter.jsx                        | Resource library
+  teacher            | TeacherCenter.jsx                        | Global Q&A / teacher-facing content
+  ai-interview       | AIInterview.jsx                          |
+  ai-english         | AIEnglish.jsx                            |
+  notifications      | Notifications.jsx                        |
+  messages           | Messages.jsx                             |
+  communities        | Communities.jsx                          |
+  bookmarks          | Bookmarks.jsx                            |
+  jobs               | Jobs.jsx                                 |
+  events             | Events.jsx                               |
+  settings           | Settings.jsx                             |
+  network            | Network.jsx                              |
+  profile            | Profile.jsx                              |
+  admin              | AdminDashboard.jsx                       | Tenant admin
+  super-admin        | SuperAdminDashboard.jsx                  | Platform super-admin
+  rcpit-chatgpt      | RCPITChatGPT.jsx                         |
+
+Left sidebar groups (from LeftSidebar.jsx):
+  Menu:     Home, Profile, Messages, Notifications, Communities, Bookmarks
+  Discover: Library, Teachers, Jobs, Events, Network
+  AI Tools: AI Interview, AI English, RCPIT ChatGPT
+  Admin:    Admin, Super Admin
+  Bottom:   Settings
+
+
+AUTH SCREENS (not currentPage — pathname / inline)
+----------------------------------------------------
+  View              | Component file      | When
+  ------------------+---------------------+----------------------------------
+  Login             | Login.jsx           | !user && path !== '/register'
+  Register          | Register.jsx        | !user && path === '/register'
+
+
+LAYOUT & GLOBAL UI (used across the app)
+----------------------------------------
+  Component          | File                 | Role
+  -------------------+----------------------+----------------------------------
+  Header             | Header.jsx           | Top bar: search, nav, user menu, mobile menu
+  LeftSidebar        | LeftSidebar.jsx      | Primary nav + mobile drawer
+  RightSidebar       | RightSidebar.jsx     | Home feed only — widgets, notices (xl+)
+  FeedTabs           | FeedTabs.jsx         | For-you / Following / Trending / Network
+  CreatePost         | CreatePost.jsx       | Composer on home
+  PostCard           | PostCard.jsx         | Single post on feed
+  FeedSkeleton       | FeedSkeleton.jsx     | Loading skeleton for feed
+  NavigationTabs     | NavigationTabs.jsx   | (if used inside feature areas)
+  HighlightMatch     | HighlightMatch.jsx   | Search result highlighting (Header search)
+
+
+FEATURE AREA COMPONENTS (imported by App or nested)
+---------------------------------------------------
+  Component          | File
+  -------------------+----------------------------
+  AIEnglish          | AIEnglish.jsx
+  AIInterview        | AIInterview.jsx
+  AdminDashboard     | AdminDashboard.jsx
+  Bookmarks          | Bookmarks.jsx
+  Communities        | Communities.jsx
+  CreatePost         | CreatePost.jsx
+  Events             | Events.jsx
+  FeedSkeleton       | FeedSkeleton.jsx
+  FeedTabs           | FeedTabs.jsx
+  Header             | Header.jsx
+  Jobs               | Jobs.jsx
+  LeftSidebar        | LeftSidebar.jsx
+  LibraryCenter      | LibraryCenter.jsx
+  Login              | Login.jsx
+  Messages           | Messages.jsx
+  Network            | Network.jsx
+  Notifications      | Notifications.jsx
+  PostCard           | PostCard.jsx
+  Profile            | Profile.jsx
+  RCPITChatGPT       | RCPITChatGPT.jsx
+  Register           | Register.jsx
+  RightSidebar       | RightSidebar.jsx
+  Settings           | Settings.jsx
+  SuperAdminDashboard| SuperAdminDashboard.jsx
+  TeacherCenter      | TeacherCenter.jsx
+
+
+SMALL / SHARED COMPONENTS (under src/components/)
+-------------------------------------------------
+  Component     | File            | Typical use
+  --------------+-----------------+-------------------------------------------
+  NavLink       | NavLink.jsx     | react-router-dom NavLink wrapper — no imports found elsewhere (dead code candidate)
+  ProfileCard   | ProfileCard.jsx | Presentational card — no imports found (dead code candidate)
+  StatsCard     | StatsCard.jsx   | Metric card — no imports found (dead code candidate)
+  TeachersTable | TeachersTable.jsx | Table — no imports found (dead code candidate)
+  Sidebar       | Sidebar.jsx     | Legacy/simple sidebar — no imports found (dead code candidate); not ui/sidebar.jsx
+  ViewProfile   | ViewProfile.jsx | Other user profile — no imports found (dead code candidate)
+
+  Note: Dead-code status is from a static import search; re-verify before deleting.
+
+
+PAGES FOLDER (src/pages/)
+-------------------------
+  File         | Status
+  -------------+----------------------------------------------------------
+  Index.jsx    | Placeholder — returns null; comment says App is real entry
+  NotFound.jsx | Standalone 404-style component — NOT wired in main.jsx/App (no router)
+
+
+SHADCN / UI PRIMITIVES (src/components/ui/)
+-------------------------------------------
+These are design-system building blocks. Enhance globally (theme, a11y) or per usage.
+
+  accordion.jsx
+  alert-dialog.jsx
+  alert.jsx
+  aspect-ratio.jsx
+  avatar.jsx
+  badge.jsx
+  breadcrumb.jsx
+  button.jsx
+  calendar.jsx
+  card.jsx
+  carousel.jsx
+  chart.jsx
+  checkbox.jsx
+  collapsible.jsx
+  command.jsx
+  context-menu.jsx
+  dialog.jsx
+  drawer.jsx
+  dropdown-menu.jsx
+  form.jsx
+  hover-card.jsx
+  input-otp.jsx
+  input.jsx
+  label.jsx
+  menubar.jsx
+  navigation-menu.jsx
+  pagination.jsx
+  popover.jsx
+  progress.jsx
+  radio-group.jsx
+  resizable.jsx
+  scroll-area.jsx
+  select.jsx
+  separator.jsx
+  sheet.jsx
+  sidebar.jsx          (large — SidebarProvider, rail, menu, etc.)
+  skeleton.jsx
+  slider.jsx
+  sonner.jsx
+  switch.jsx
+  table.jsx
+  tabs.jsx
+  textarea.jsx
+  toast.jsx
+  toaster.jsx
+  toggle-group.jsx
+  toggle.jsx
+  tooltip.jsx
+  use-toast.js         (toast state helpers; also hooks/use-toast.js — check duplication)
+
+
+OTHER SOURCE FILES (for cross-cutting enhancements)
+---------------------------------------------------
+  contexts/AuthContext.jsx     — auth user, login/register/logout (mock vs API)
+  hooks/use-mobile.jsx          — responsive breakpoint helper
+  hooks/use-toast.js
+  lib/utils.js                  — cn() and small utilities
+  utils/shellEvents.js
+  services/*.js                 — API layer (axios + mockApi); enhance when wiring backend
+
+
+SUGGESTED ENHANCEMENT ORDER (optional)
+--------------------------------------
+1) Global: Header + LeftSidebar + tokens in index.css (consistency)
+2) Home: FeedTabs → CreatePost → PostCard → RightSidebar
+3) Core social: Messages, Notifications, Communities, Network
+4) Content: LibraryCenter, TeacherCenter, Bookmarks
+5) Career: Jobs, Events
+6) AI: AIEnglish, AIInterview, RCPITChatGPT
+7) Settings + Profile
+8) AdminDashboard + SuperAdminDashboard
+9) ui/* primitives (only if changing design system)
+10) Router: consider react-router for /register, deep links, and NotFound — currently limited
+
+
+QUICK REFERENCE — FILE COUNT
+----------------------------
+• Feature/layout components (src/components/*.jsx, excluding ui/): ~35
+• UI primitives (src/components/ui/*): ~50+ files
+• Pages (src/pages/*): 2 (mostly placeholders)
+
+
+================================================================================
+  End of inventory. Edit this file as you add routes or new screens.
+================================================================================

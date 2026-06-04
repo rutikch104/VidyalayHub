@@ -1,0 +1,11 @@
+.profile-page__hero {
+  transition: box-shadow 0.25s ease;
+}
+
+.profile-page__hero:hover {
+  box-shadow: 0 12px 40px hsl(var(--foreground) / 0.06);
+}
+
+.profile-page nav button {
+  transition: color 0.2s ease, background 0.2s ease;
+}
