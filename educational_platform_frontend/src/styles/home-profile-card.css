@@ -1,0 +1,477 @@
+/* Homepage profile cards — LinkedIn-inspired sidebar identity cards */
+
+.home-profile-card {
+  --hpc-radius: 1.25rem;
+  --hpc-shadow: 0 1px 2px hsl(222 47% 11% / 0.04), 0 4px 18px hsl(222 47% 11% / 0.06);
+  --hpc-shadow-hover: 0 2px 4px hsl(222 47% 11% / 0.05), 0 12px 32px hsl(222 47% 11% / 0.1);
+  overflow: hidden;
+  border-radius: var(--hpc-radius);
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card));
+  box-shadow: var(--hpc-shadow);
+  transition: box-shadow 0.28s ease, transform 0.28s ease, border-color 0.28s ease;
+}
+
+.home-profile-card:hover {
+  border-color: hsl(var(--border) / 0.75);
+  box-shadow: var(--hpc-shadow-hover);
+}
+
+.home-profile-card__cover {
+  position: relative;
+  height: 5.5rem;
+  overflow: hidden;
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(262 70% 58%) 100%);
+}
+
+.home-profile-card__cover img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.home-profile-card__cover-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    hsl(222 47% 11% / 0.08) 0%,
+    hsl(222 47% 11% / 0.28) 55%,
+    hsl(222 47% 11% / 0.42) 100%
+  );
+}
+
+.home-profile-card__settings {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(0 0% 100% / 0.22);
+  background: hsl(0 0% 100% / 0.16);
+  padding: 0.45rem;
+  color: hsl(0 0% 100%);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.home-profile-card__settings:hover {
+  background: hsl(0 0% 100% / 0.26);
+  border-color: hsl(0 0% 100% / 0.35);
+  transform: scale(1.04);
+}
+
+.home-profile-card__body {
+  position: relative;
+  padding: 0 1.125rem 1.125rem;
+}
+
+.home-profile-card__avatar-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: -2.625rem;
+  margin-bottom: 0.75rem;
+}
+
+.home-profile-card__avatar-ring {
+  border-radius: 9999px;
+  padding: 3px;
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%);
+  box-shadow:
+    0 0 0 1px hsl(var(--border) / 0.35),
+    0 8px 24px hsl(222 47% 11% / 0.12);
+}
+
+.home-profile-card__identity {
+  text-align: center;
+}
+
+.home-profile-card__name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.home-profile-card__name {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: hsl(var(--foreground));
+}
+
+.home-profile-card__badge-icon {
+  flex-shrink: 0;
+}
+
+.home-profile-card__headline {
+  margin: 0 auto 0.625rem;
+  max-width: 18rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground) / 0.72);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.home-profile-card__role {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home-profile-card__role--student {
+  border-color: hsl(199 89% 48% / 0.22);
+  background: hsl(199 89% 48% / 0.1);
+  color: hsl(200 80% 32%);
+}
+
+.home-profile-card__role--teacher {
+  border-color: hsl(38 92% 50% / 0.24);
+  background: hsl(38 92% 50% / 0.12);
+  color: hsl(32 80% 34%);
+}
+
+.home-profile-card__role--alumni {
+  border-color: hsl(262 70% 58% / 0.22);
+  background: hsl(262 70% 58% / 0.1);
+  color: hsl(262 55% 38%);
+}
+
+.home-profile-card__role--staff {
+  border-color: hsl(152 60% 40% / 0.22);
+  background: hsl(152 60% 40% / 0.1);
+  color: hsl(152 55% 28%);
+}
+
+.home-profile-card__role--member {
+  border-color: hsl(var(--border) / 0.7);
+  background: hsl(var(--muted) / 0.55);
+  color: hsl(var(--muted-foreground));
+}
+
+.home-profile-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 0.875rem;
+  text-align: left;
+}
+
+.home-profile-card__meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: hsl(var(--muted-foreground));
+}
+
+.home-profile-card__meta-row svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  opacity: 0.72;
+}
+
+.home-profile-card__meta-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-profile-card__meta-row--location span {
+  color: hsl(var(--foreground) / 0.68);
+}
+
+.home-profile-card__skills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+}
+
+.home-profile-card__skill {
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--muted) / 0.35);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: hsl(var(--foreground) / 0.72);
+}
+
+.home-profile-card__skill--more {
+  color: hsl(var(--muted-foreground));
+}
+
+.home-profile-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border-radius: 0.875rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--muted) / 0.22);
+  margin-bottom: 0.875rem;
+}
+
+.home-profile-card__stat {
+  position: relative;
+  padding: 0.65rem 0.35rem;
+  text-align: center;
+}
+
+.home-profile-card__stat + .home-profile-card__stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 1px;
+  background: hsl(var(--border) / 0.55);
+}
+
+.home-profile-card__stat-value {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+}
+
+.home-profile-card__stat-label {
+  margin-top: 0.125rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.home-profile-card__cta {
+  width: 100%;
+  margin-top: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--primary) / 0.35);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(262 70% 58%) 100%
+  );
+  padding: 0.55rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 4px 14px hsl(var(--primary) / 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.home-profile-card__cta:hover {
+  filter: brightness(1.03);
+  box-shadow: 0 6px 18px hsl(var(--primary) / 0.28);
+  transform: translateY(-1px);
+}
+
+.home-profile-card__cta:active {
+  transform: translateY(0);
+}
+
+.home-profile-card__skeleton {
+  height: 3.25rem;
+  border-radius: 0.875rem;
+  background: hsl(var(--muted));
+  animation: home-profile-card-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes home-profile-card-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.85; }
+}
+
+/* Compact suggestion rows in "Who to Follow" */
+.home-user-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid transparent;
+  padding: 0.625rem 0.5rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.home-user-card:hover {
+  border-color: hsl(var(--border) / 0.45);
+  background: hsl(var(--muted) / 0.45);
+}
+
+.home-user-card__avatar {
+  flex-shrink: 0;
+}
+
+.home-user-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.home-user-card__name {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  color: hsl(var(--foreground));
+}
+
+.home-user-card__headline {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: hsl(var(--foreground) / 0.68);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.home-user-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.home-user-card__role {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home-user-card__role--student {
+  border-color: hsl(199 89% 48% / 0.22);
+  background: hsl(199 89% 48% / 0.1);
+  color: hsl(200 80% 32%);
+}
+
+.home-user-card__role--teacher {
+  border-color: hsl(38 92% 50% / 0.24);
+  background: hsl(38 92% 50% / 0.12);
+  color: hsl(32 80% 34%);
+}
+
+.home-user-card__role--alumni {
+  border-color: hsl(262 70% 58% / 0.22);
+  background: hsl(262 70% 58% / 0.1);
+  color: hsl(262 55% 38%);
+}
+
+.home-user-card__role--staff {
+  border-color: hsl(152 60% 40% / 0.22);
+  background: hsl(152 60% 40% / 0.1);
+  color: hsl(152 55% 28%);
+}
+
+.home-user-card__role--member {
+  border-color: hsl(var(--border) / 0.7);
+  background: hsl(var(--muted) / 0.55);
+  color: hsl(var(--muted-foreground));
+}
+
+.home-user-card__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 100%;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+}
+
+.home-user-card__location span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-user-card__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.home-user-card__skill {
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--muted) / 0.35);
+  padding: 0.05rem 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: hsl(var(--foreground) / 0.7);
+}
+
+.home-user-card__connect {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.dark .home-profile-card__role--student,
+.dark .home-user-card__role--student {
+  color: hsl(199 89% 72%);
+}
+
+.dark .home-profile-card__role--teacher,
+.dark .home-user-card__role--teacher {
+  color: hsl(38 92% 68%);
+}
+
+.dark .home-profile-card__role--alumni,
+.dark .home-user-card__role--alumni {
+  color: hsl(262 70% 78%);
+}
+
+.dark .home-profile-card__role--staff,
+.dark .home-user-card__role--staff {
+  color: hsl(152 60% 68%);
+}
+
+@media (max-width: 640px) {
+  .home-profile-card__cover {
+    height: 4.75rem;
+  }
+
+  .home-profile-card__name {
+    font-size: 0.9375rem;
+  }
+}

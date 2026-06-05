@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  MapPin, TrendingUp, Calendar, Users, Bell, Settings, Zap, BookOpen,
-  Target, Crown, Sparkles, Loader2, UserPlus, ChevronRight, Star,
+  TrendingUp, Calendar, Users, Bell, Zap, BookOpen,
+  Target, Sparkles, Loader2, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import userService from '@/services/userService';
@@ -10,14 +10,21 @@ import eventsService from '@/services/eventsService';
 import connectionService from '@/services/connectionService';
 import { emitNotificationsChanged } from '@/services/notificationService';
 import { resolveMediaUrl } from '@/services/postService';
-import ClickableUser from '@/components/ui/ClickableUser';
-import UserAvatar from '@/components/ui/UserAvatar';
-import { PRESENCE_STATUS } from '@/lib/presence';
+import { normalizeSuggestionPerson } from '@/lib/homeProfileCardHelpers';
+import HomeProfileCard from '@/components/home/HomeProfileCard';
+import HomeUserSuggestionCard from '@/components/home/HomeUserSuggestionCard';
 import NoticeBoardModal from '@/components/NoticeBoardModal';
 
 /** Default cover when the user has not uploaded a profile banner */
 const HOME_PROFILE_COVER_FALLBACK =
   'https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=800';
+
+const HOME_PROFILE_AVATAR_FALLBACK =
+  'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150';
+
+function resolveAvatarSrc(url) {
+  return resolveMediaUrl(url || '') || url || HOME_PROFILE_AVATAR_FALLBACK;
+}
 
 /* ─── formatters ────────────────────────────────────────────────── */
 function formatEventRow(ev) {
@@ -76,8 +83,8 @@ function WidgetHeader({ icon: Icon, gradient, title, actionLabel, onAction }) {
 const RightSidebar = ({ onNavigate }) => {
   const { user } = useAuth();
 
-  const [summaryLoading,    setSummaryLoading]    = useState(true);
   const [summary,           setSummary]           = useState({ posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null });
+  const [profileSnapshot,   setProfileSnapshot]   = useState(null);
   const [trendingLoading,   setTrendingLoading]   = useState(true);
   const [trendingHashtags,  setTrendingHashtags]  = useState([]);
   const [trendingSkills,    setTrendingSkills]    = useState([]);
@@ -94,15 +101,26 @@ const RightSidebar = ({ onNavigate }) => {
 
   const loadAll = useCallback(async () => {
     if (!user) {
-      [setSummaryLoading, setTrendingLoading, setNoticesLoading, setEventsLoading, setSuggestionsLoading]
+      // Reset to empty/idle so previous user's data doesn't bleed through
+      // when switching accounts or logging out.
+      [setTrendingLoading, setNoticesLoading, setEventsLoading, setSuggestionsLoading]
         .forEach((fn) => fn(false));
+      setSummary({ posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null });
+      setProfileSnapshot(null);
+      setTrendingHashtags([]);
+      setTrendingSkills([]);
+      setNotices([]);
+      setUpcomingEvents([]);
+      setSuggestions([]);
+      setConnectedIds(new Set());
       return;
     }
-    [setSummaryLoading, setTrendingLoading, setNoticesLoading, setEventsLoading, setSuggestionsLoading]
+    [setTrendingLoading, setNoticesLoading, setEventsLoading, setSuggestionsLoading]
       .forEach((fn) => fn(true));
 
     const results = await Promise.allSettled([
       userService.getMeSidebarSummary(),
+      userService.getCurrentUserProfile(),
       feedService.getTrendingTopicsDetailed(),
       feedService.getSidebarNotices(5),
       eventsService.getEvents({ tab: 'Upcoming', limit: 3, page: 1 }),
@@ -111,34 +129,47 @@ const RightSidebar = ({ onNavigate }) => {
 
     if (results[0].status === 'fulfilled') setSummary(results[0].value);
     else setSummary({ posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null });
-    setSummaryLoading(false);
 
-    if (results[1].status === 'fulfilled') {
-      const t = results[1].value;
+    if (results[1].status === 'fulfilled') setProfileSnapshot(results[1].value);
+    else setProfileSnapshot(null);
+
+    if (results[2].status === 'fulfilled') {
+      const t = results[2].value;
       setTrendingHashtags(t.hashtags.slice(0, 5));
       setTrendingSkills(t.skills.slice(0, 3));
     } else { setTrendingHashtags([]); setTrendingSkills([]); }
     setTrendingLoading(false);
 
-    setNotices(results[2].status === 'fulfilled' ? results[2].value : []);
+    setNotices(results[3].status === 'fulfilled' ? results[3].value : []);
     setNoticesLoading(false);
 
-    setUpcomingEvents(results[3].status === 'fulfilled' ? (results[3].value.events || []) : []);
+    setUpcomingEvents(results[4].status === 'fulfilled' ? (results[4].value.events || []) : []);
     setEventsLoading(false);
 
-    setSuggestions(results[4].status === 'fulfilled' ? (results[4].value.users || []) : []);
+    setSuggestions(results[5].status === 'fulfilled' ? (results[5].value.users || []) : []);
     setSuggestionsLoading(false);
-  }, [user]);
+    // Reset any optimistic "Sent" markers from a previous session — server
+    // is the source of truth and would already filter out already-connected
+    // suggestions, so any stale set entries are misleading.
+    setConnectedIds(new Set());
+    // Depend on user.id only — the user object reference can change between
+    // AuthContext renders even when identity hasn't, which would re-trigger
+    // the chained useEffect and fire all six requests redundantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => { void loadAll(); }, [loadAll]);
 
-  const displayLocation = summary.location?.trim() || user?.location?.trim?.() || null;
-
   const profileCoverSrc = useMemo(() => {
-    const raw = user?.cover_image_url || summary.cover_image_url;
+    const raw = user?.cover_image_url || profileSnapshot?.cover_image_url || summary.cover_image_url;
     if (raw) return resolveMediaUrl(raw) || raw;
     return HOME_PROFILE_COVER_FALLBACK;
-  }, [user?.cover_image_url, summary.cover_image_url]);
+  }, [user?.cover_image_url, profileSnapshot?.cover_image_url, summary.cover_image_url]);
+
+  const suggestionCards = useMemo(
+    () => suggestions.map((person) => normalizeSuggestionPerson(person, resolveAvatarSrc)),
+    [suggestions],
+  );
 
   const handleConnect = async (targetId) => {
     setConnectBusyId(targetId);
@@ -149,13 +180,6 @@ const RightSidebar = ({ onNavigate }) => {
     } catch (e) { console.error(e); }
     finally { setConnectBusyId(null); }
   };
-
-  const suggestionName = (u) =>
-    [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || 'Member';
-
-  const avatarSrc = (url) =>
-    resolveMediaUrl(url || '') || url ||
-    'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150';
 
   return (
     <div className="w-full space-y-5">
@@ -169,88 +193,15 @@ const RightSidebar = ({ onNavigate }) => {
         initialNoticeId={noticeFocusId}
       />
 
-      {/* ── Profile card ── */}
-      <div className="app-card overflow-hidden rounded-2xl p-0 ring-1 ring-border/45 shadow-professional">
-        {/* Cover — profile banner image */}
-        <div className="relative h-[5.25rem] overflow-hidden">
-          <img
-            src={profileCoverSrc}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-            onError={(e) => {
-              if (e.currentTarget.src !== HOME_PROFILE_COVER_FALLBACK) {
-                e.currentTarget.src = HOME_PROFILE_COVER_FALLBACK;
-              }
-            }}
-          />
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-black/5"
-            aria-hidden
-          />
-          <button
-            type="button"
-            onClick={() => onNavigate?.('settings')}
-            className="absolute right-3 top-3 rounded-xl bg-white/18 p-2 text-white shadow-sm ring-1 ring-white/25 backdrop-blur-sm transition-all hover:bg-white/28 hover:ring-white/40"
-            aria-label="Settings"
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Profile content */}
-        <div className="relative -mt-10 px-5 pb-5">
-          <div className="mb-3 flex justify-center">
-            <UserAvatar
-              src={avatarSrc(user?.avatar_url)}
-              alt="Profile"
-              size="2xl"
-              status={PRESENCE_STATUS.ONLINE}
-              ring={false}
-              imgClassName="border-4 border-card shadow-soft"
-            />
-          </div>
-
-          <div className="text-center">
-            <div className="mb-1 flex items-center justify-center gap-1.5">
-              <h3 className="text-sm font-bold text-foreground">{user?.name || 'User'}</h3>
-              <Crown className="h-3.5 w-3.5 text-amber-500" aria-hidden />
-            </div>
-            <p className="mb-1 text-xs text-muted-foreground">
-              {user?.title || 'Student'} · {user?.user_type || user?.role || 'Member'}
-            </p>
-            <div className="mb-4 flex items-center justify-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{displayLocation || 'Add location in profile'}</span>
-            </div>
-
-            {/* Stats */}
-            {summaryLoading ? (
-              <SectionSkeleton rows={1} />
-            ) : (
-              <div className="mb-4 grid grid-cols-3 divide-x divide-border/40 rounded-xl border border-border/50 bg-muted/25 shadow-inner">
-                {[
-                  { value: summary.connections_count, label: 'Connections' },
-                  { value: summary.posts_count,        label: 'Posts' },
-                  { value: summary.likes_received,     label: 'Likes' },
-                ].map(({ value, label }) => (
-                  <div key={label} className="py-2.5 text-center">
-                    <p className="text-sm font-bold text-foreground">{value}</p>
-                    <p className="text-[10px] text-muted-foreground">{label}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => onNavigate?.('profile')}
-              className="app-btn-primary w-full py-2 text-sm"
-            >
-              View Profile
-            </button>
-          </div>
-        </div>
-      </div>
+      <HomeProfileCard
+        user={user}
+        profile={profileSnapshot}
+        summary={summary}
+        coverSrc={profileCoverSrc}
+        avatarSrc={resolveAvatarSrc(user?.avatar_url || profileSnapshot?.avatar_url)}
+        onViewProfile={() => onNavigate?.('profile')}
+        onSettings={() => onNavigate?.('settings')}
+      />
 
       {/* ── Trending ── */}
       <Widget>
@@ -437,41 +388,16 @@ const RightSidebar = ({ onNavigate }) => {
             You&apos;re well connected! Check back later.
           </p>
         ) : (
-          <div className="space-y-1">
-            {suggestions.map((person) => {
-              const pid  = String(person.id);
-              const done = connectedIds.has(pid);
-              return (
-                <div
-                  key={pid}
-                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-muted/60"
-                >
-                  <ClickableUser
-                    userId={pid}
-                    name={suggestionName(person)}
-                    avatarUrl={avatarSrc(person.profile_picture)}
-                    showName
-                    subtitle={person.user_type || 'Member'}
-                    size="sm"
-                    showStatus={false}
-                    className="min-w-0 flex-1"
-                  />
-                  <button
-                    type="button"
-                    disabled={done || connectBusyId === pid}
-                    onClick={() => void handleConnect(pid)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-brand-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {connectBusyId === pid ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <UserPlus className="h-3 w-3" />
-                    )}
-                    {done ? 'Sent' : 'Connect'}
-                  </button>
-                </div>
-              );
-            })}
+          <div className="space-y-0.5">
+            {suggestionCards.map((person) => (
+              <HomeUserSuggestionCard
+                key={person.id}
+                person={person}
+                connectBusy={connectBusyId === person.id}
+                connected={connectedIds.has(person.id)}
+                onConnect={handleConnect}
+              />
+            ))}
           </div>
         )}
       </Widget>

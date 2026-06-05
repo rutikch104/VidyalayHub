@@ -48,7 +48,7 @@ const userService = {
         const body = response.data;
         if (body?.status && body.data)
             return body.data;
-        return { posts_count: 0, connections_count: 0, likes_received: 0, location: null };
+        return { posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null };
     },
     getPublicProfile: async (userId) => {
         const response = await api.get(`/users/${userId}/public-profile`);

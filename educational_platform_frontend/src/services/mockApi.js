@@ -325,9 +325,39 @@ const mockNetworkUsers = [
     { id: '4', connection_id: 'cn3', first_name: 'Sneha', last_name: 'Joshi', profile_picture: AVATAR4, user_type: 'student' },
 ];
 const mockSuggestions = [
-    { id: '6', first_name: 'Raj', last_name: 'Kulkarni', profile_picture: AVATAR2, user_type: 'teacher' },
-    { id: '7', first_name: 'Anita', last_name: 'More', profile_picture: AVATAR4, user_type: 'student' },
-    { id: '8', first_name: 'Deepak', last_name: 'Thakur', profile_picture: AVATAR, user_type: 'alumni' },
+    {
+        id: '6',
+        first_name: 'Raj',
+        last_name: 'Kulkarni',
+        profile_picture: AVATAR2,
+        user_type: 'teacher',
+        headline: 'Assistant Professor, Computer Science',
+        college_name: 'RCPIT Shirpur',
+        location: 'Shirpur, Maharashtra',
+        skills: ['Machine Learning', 'Python', 'Research'],
+    },
+    {
+        id: '7',
+        first_name: 'Anita',
+        last_name: 'More',
+        profile_picture: AVATAR4,
+        user_type: 'student',
+        headline: 'Computer Engineering Student',
+        college_name: 'RCPIT Shirpur',
+        location: 'Pune, Maharashtra',
+        skills: ['React', 'Node.js'],
+    },
+    {
+        id: '8',
+        first_name: 'Deepak',
+        last_name: 'Thakur',
+        profile_picture: AVATAR,
+        user_type: 'alumni',
+        headline: 'Cloud Solutions Architect',
+        college_name: 'RCPIT Shirpur',
+        location: 'Bangalore, Karnataka',
+        skills: ['AWS', 'Kubernetes', 'DevOps'],
+    },
 ];
 const mockTeachers = [
     { id: '10', first_name: 'Dr. Rajesh', last_name: 'Patil', email: 'rajesh.patil@rcpit.edu', department: 'CSE', designation: 'Professor & HOD', specialization: 'AI & ML', avatar_url: AVATAR2, rating: 4.8, total_reviews: 45, subjects: ['Machine Learning', 'Artificial Intelligence', 'Deep Learning'] },
