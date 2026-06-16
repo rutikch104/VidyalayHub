@@ -1,16 +1,6 @@
-import { Loader2, MapPin, UserPlus } from 'lucide-react';
+import { Check, Loader2, UserPlus } from 'lucide-react';
 import ClickableUser from '@/components/ui/ClickableUser';
-
-function RoleBadge({ userType, label }) {
-  const roleKey = ['student', 'teacher', 'alumni', 'staff'].includes(userType)
-    ? userType
-    : 'member';
-  return (
-    <span className={`home-user-card__role home-user-card__role--${roleKey}`}>
-      {label}
-    </span>
-  );
-}
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
 
 export default function HomeUserSuggestionCard({
   person,
@@ -30,7 +20,7 @@ export default function HomeUserSuggestionCard({
         className="home-user-card__avatar"
       />
 
-      <div className="home-user-card__content">
+      <div className="home-user-card__body">
         <ClickableUser
           userId={person.id}
           name={person.name}
@@ -38,30 +28,22 @@ export default function HomeUserSuggestionCard({
           showAvatar={false}
           showName
           showStatus={false}
-          className="block w-full"
-          nameClassName="home-user-card__name hover:text-primary"
+          className="home-user-card__name-link"
+          nameClassName="home-user-card__name"
         />
 
-        {person.headline ? (
-          <p className="home-user-card__headline" title={person.headline}>
-            {person.headline}
-          </p>
-        ) : null}
-
-        <div className="home-user-card__meta">
-          <RoleBadge userType={person.userType} label={person.roleLabel} />
-          {person.location ? (
-            <span className="home-user-card__location" title={person.location}>
-              <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-              <span>{person.location}</span>
-            </span>
-          ) : null}
-        </div>
-
-        {person.institution ? (
-          <p className="mt-1 truncate text-[0.625rem] font-medium text-muted-foreground">
-            {person.institution}
-          </p>
+        {(person.academic_identity || person.professional_identity || person.headline) ? (
+          <AcademicIdentityLine
+            user={{
+              academic_identity: person.academic_identity || person.headline,
+              professional_identity: person.professional_identity,
+              user_type: person.userType || person.role,
+              company: person.company,
+              position: person.position,
+              tenant_name: person.college,
+            }}
+            className="academic-identity-line--compact home-user-card__identity line-clamp-2"
+          />
         ) : null}
       </div>
 
@@ -69,14 +51,19 @@ export default function HomeUserSuggestionCard({
         type="button"
         disabled={connected || connectBusy}
         onClick={() => onConnect?.(person.id)}
-        className="home-user-card__connect inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-brand-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label={connected ? 'Connection request sent' : `Connect with ${person.name}`}
+        className={[
+          'home-user-card__connect',
+          connected ? 'home-user-card__connect--sent' : '',
+        ].filter(Boolean).join(' ')}
       >
         {connectBusy ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        ) : connected ? (
+          <Check className="h-4 w-4" aria-hidden />
         ) : (
-          <UserPlus className="h-3 w-3" />
+          <UserPlus className="h-4 w-4" aria-hidden />
         )}
-        {connected ? 'Sent' : 'Connect'}
       </button>
     </article>
   );

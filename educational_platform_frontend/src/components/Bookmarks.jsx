@@ -22,15 +22,8 @@ import bookmarkService from '@/services/bookmarkService';
 import PageHeader from '@/components/ui/PageHeader';
 import ModuleFeedTabs from '@/components/ui/ModuleFeedTabs';
 import EmptyState from '@/components/ui/EmptyState';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
 
 const FILTER_OPTIONS = [
   { value: 'all', label: 'All', icon: Bookmark },
@@ -410,49 +403,23 @@ export default function Bookmarks() {
         </div>
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && closeDeleteConfirm()}>
-        <AlertDialogContent className="bookmark-delete-modal gap-0 p-0">
-          <AlertDialogHeader className="bookmark-delete-modal__header text-left">
-            <div className="bookmark-delete-modal__icon" aria-hidden>
-              <Trash2 className="h-5 w-5" />
-            </div>
-            <AlertDialogTitle className="bookmark-delete-modal__title">
-              Remove bookmark?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="bookmark-delete-modal__desc">
-              This item will be removed from your saved bookmarks. You can always save it again
-              later from the original post or page.
-            </AlertDialogDescription>
-            {deleteTarget?.title ? (
-              <p className="bookmark-delete-modal__item">{deleteTarget.title}</p>
-            ) : null}
-          </AlertDialogHeader>
-
-          {deleteError ? (
-            <p className="bookmark-delete-modal__error" role="alert">
-              {deleteError}
-            </p>
-          ) : null}
-
-          <AlertDialogFooter className="bookmark-delete-modal__footer sm:space-x-0">
-            <AlertDialogCancel
-              disabled={deleting}
-              className="bookmark-delete-modal__btn bookmark-delete-modal__btn--cancel mt-0 border-0 shadow-none"
-            >
-              Cancel
-            </AlertDialogCancel>
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={confirmDelete}
-              className="bookmark-delete-modal__btn bookmark-delete-modal__btn--delete"
-            >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {deleting ? 'Removing…' : 'Remove bookmark'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) closeDeleteConfirm();
+        }}
+        title={CONFIRM_ACTION_PRESETS.removeBookmark.title}
+        description={CONFIRM_ACTION_PRESETS.removeBookmark.description}
+        confirmLabel={CONFIRM_ACTION_PRESETS.removeBookmark.confirmLabel}
+        tone={CONFIRM_ACTION_PRESETS.removeBookmark.tone}
+        icon={CONFIRM_ACTION_PRESETS.removeBookmark.icon}
+        loading={deleting}
+        loadingLabel="Removing…"
+        error={deleteError}
+        contextPreview={deleteTarget?.title}
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteConfirm}
+      />
     </div>
   );
 }

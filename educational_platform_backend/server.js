@@ -52,6 +52,8 @@ const { ensureMessagesSchema } = require('./database/ensureMessagesSchema');
 const { ensureGlobalQuestionsSchema } = require('./database/ensureGlobalQuestionsSchema');
 const { ensureSocialMentionsSchema } = require('./database/ensureSocialMentionsSchema');
 const { ensureJobsEnhancementsSchema } = require('./database/ensureJobsEnhancementsSchema');
+const { ensureJobSkillsSchema } = require('./database/ensureJobSkillsSchema');
+const { backfillJobSkillsFromPosts } = require('./services/jobSkillsService');
 const { ensureNetworkEnhancementsSchema } = require('./database/ensureNetworkEnhancementsSchema');
 const { ensureBookmarksSchema } = require('./database/ensureBookmarksSchema');
 const { ensureTenantNoticesSchema } = require('./database/ensureTenantNoticesSchema');
@@ -60,6 +62,8 @@ const { ensureInterviewSchema } = require('./database/ensureInterviewSchema');
 const { ensureRbacSchema } = require('./database/ensureRbacSchema');
 const { ensureMediaSchema } = require('./database/ensureMediaSchema');
 const { ensureSuperAdminSchema } = require('./database/ensureSuperAdminSchema');
+const { ensureTenantProfileSchema } = require('./database/ensureTenantProfileSchema');
+const { ensureAlumniDetailsSchema } = require('./database/ensureAlumniDetailsSchema');
 const { ensureTenantSaasSchema } = require('./database/ensureTenantSaasSchema');
 const { tenantResolver } = require('./middleware/tenant');
 const http = require("http");
@@ -207,6 +211,8 @@ async function runSchemaBootstrap() {
 	await ensureGlobalQuestionsSchema(db.sequelize);
 	await ensureSocialMentionsSchema(db.sequelize);
 	await ensureJobsEnhancementsSchema(db.sequelize);
+	await ensureJobSkillsSchema(db.sequelize);
+	await backfillJobSkillsFromPosts();
 	await ensureNetworkEnhancementsSchema(db.sequelize);
 	await ensureBookmarksSchema(db.sequelize);
 	await ensureTenantNoticesSchema(db.sequelize);
@@ -216,6 +222,8 @@ async function runSchemaBootstrap() {
 	await ensureRbacSchema(db.sequelize);
 	await ensureMediaSchema(db.sequelize);
 	await ensureTenantSaasSchema(db.sequelize);
+	await ensureTenantProfileSchema(db.sequelize);
+	await ensureAlumniDetailsSchema(db.sequelize);
 }
 
 function skipSequelizeSync() {

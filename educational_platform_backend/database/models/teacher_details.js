@@ -114,6 +114,26 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true,
         },
+        employee_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        faculty_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        specialization: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        id_document_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        employment_proof_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
         created_at: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,

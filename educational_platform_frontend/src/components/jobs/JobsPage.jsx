@@ -40,6 +40,7 @@ export default function JobsPage() {
   const [experience, setExperience] = useState('all');
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [sort, setSort] = useState('latest');
+  const [selectedSkill, setSelectedSkill] = useState('');
   const [stats, setStats] = useState(null);
   const [popularSkills, setPopularSkills] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -73,9 +74,10 @@ export default function JobsPage() {
       if (category !== 'all') params.category = category;
       if (experience !== 'all') params.experience_level = experience;
       if (remoteOnly) params.is_remote = true;
+      if (selectedSkill) params.skills = selectedSkill;
       return params;
     },
-    [debouncedSearch, location, jobType, category, experience, remoteOnly, sort],
+    [debouncedSearch, location, jobType, category, experience, remoteOnly, sort, selectedSkill],
   );
 
   const activeFilterCount = useMemo(() => {
@@ -87,8 +89,9 @@ export default function JobsPage() {
     if (experience !== 'all') n += 1;
     if (remoteOnly) n += 1;
     if (sort !== 'latest') n += 1;
+    if (selectedSkill) n += 1;
     return n;
-  }, [debouncedSearch, category, jobType, location, experience, remoteOnly, sort]);
+  }, [debouncedSearch, category, jobType, location, experience, remoteOnly, sort, selectedSkill]);
 
   const clearAllFilters = () => {
     setSearchTerm('');
@@ -99,6 +102,7 @@ export default function JobsPage() {
     setExperience('all');
     setRemoteOnly(false);
     setSort('latest');
+    setSelectedSkill('');
   };
 
   const fetchJobs = useCallback(
@@ -275,9 +279,9 @@ export default function JobsPage() {
             remoteOnly={remoteOnly}
             onRemoteOnlyChange={setRemoteOnly}
             popularSkills={popularSkills}
+            selectedSkill={selectedSkill}
             onSkillClick={(skill) => {
-              setSearchTerm(skill);
-              setDebouncedSearch(skill);
+              setSelectedSkill((prev) => (prev === skill ? '' : skill));
             }}
             onClearAll={clearAllFilters}
             activeFilterCount={activeFilterCount}

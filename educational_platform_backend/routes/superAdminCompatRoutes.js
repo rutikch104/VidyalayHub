@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { requireSuperAdminAccess } = require('../middleware/superAdminAccess');
+const { upload } = require('../middleware/uploadMiddleware');
 const c = require('../controllers/superAdminCompatController');
 
 router.use(authenticate);
@@ -11,14 +12,16 @@ router.get('/metrics', c.getSystemMetrics);
 router.get('/users', c.listAllUsers);
 
 router.get('/colleges', c.getColleges);
-router.post('/colleges', c.createCollege);
+router.post('/colleges', upload.tenantLogoOptional, c.createCollege);
 router.get('/colleges/:collegeId/stats', c.getCollegeStats);
 router.put('/colleges/:collegeId/status', c.toggleCollegeStatus);
 router.put('/colleges/:collegeId/subscription', c.updateSubscription);
 router.post('/colleges/:collegeId/notify', c.sendNotification);
 router.post('/colleges/:collegeId/portal-admin', c.createCollegePortalAdmin);
+router.post('/colleges/:collegeId/logo', upload.tenantLogo, c.uploadCollegeLogo);
+router.delete('/colleges/:collegeId/logo', c.removeCollegeLogo);
 router.get('/colleges/:collegeId', c.getCollege);
-router.put('/colleges/:collegeId', c.updateCollege);
+router.put('/colleges/:collegeId', upload.tenantLogoOptional, c.updateCollege);
 router.delete('/colleges/:collegeId', c.deleteCollege);
 
 router.get('/analytics', c.getAnalytics);

@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const db = require('../database/index');
+const { loadAcademicIdentityForUsers } = require('./academicIdentity');
 
 const NETWORK_USER_ATTRS = [
   'id',
@@ -162,51 +163,12 @@ async function loadSkillsForUsers(userIds) {
 }
 
 async function loadHeadlineForUsers(users) {
-  const map = new Map();
-  const byType = { student: [], teacher: [], alumni: [] };
-  for (const u of users) {
-    const j = u.toJSON ? u.toJSON() : u;
-    if (byType[j.user_type]) byType[j.user_type].push(j.id);
+  const identityMap = await loadAcademicIdentityForUsers(users);
+  const headlines = new Map();
+  for (const [userId, fields] of identityMap.entries()) {
+    if (fields?.academic_identity) headlines.set(userId, fields.academic_identity);
   }
-
-  if (byType.student.length) {
-    const rows = await db.StudentDetail.findAll({
-      where: { user_id: { [Op.in]: byType.student } },
-      attributes: ['user_id', 'degree', 'stream', 'year', 'semester'],
-    });
-    for (const r of rows) {
-      const parts = [r.degree, r.stream, r.year, r.semester ? `Sem ${r.semester}` : null].filter(Boolean);
-      if (parts.length) map.set(String(r.user_id), parts.join(' · '));
-    }
-  }
-  if (byType.teacher.length) {
-    const rows = await db.TeacherDetail.findAll({
-      where: { user_id: { [Op.in]: byType.teacher } },
-      attributes: ['user_id', 'department', 'designation'],
-    });
-    for (const r of rows) {
-      const parts = [r.designation, r.department].filter(Boolean);
-      if (parts.length) map.set(String(r.user_id), parts.join(' · '));
-    }
-  }
-  if (byType.alumni.length) {
-    const rows = await db.AlumniDetail.findAll({
-      where: { user_id: { [Op.in]: byType.alumni } },
-      attributes: ['user_id', 'current_job_title', 'company_name', 'year_of_graduation'],
-    });
-    for (const r of rows) {
-      const gradYear = r.year_of_graduation
-        ? new Date(r.year_of_graduation).getFullYear()
-        : null;
-      const parts = [
-        r.current_job_title,
-        r.company_name,
-        gradYear ? `Class of ${gradYear}` : null,
-      ].filter(Boolean);
-      if (parts.length) map.set(String(r.user_id), parts.join(' · '));
-    }
-  }
-  return map;
+  return headlines;
 }
 
 function baseNetworkUserShape(user, extras = {}) {
@@ -229,20 +191,31 @@ async function enrichUsersForNetwork(viewerId, users, options = {}) {
   const list = users.map((u) => (u.toJSON ? u.toJSON() : u));
   const ids = list.map((u) => u.id);
   const tenantIds = list.map((u) => u.tenant_id);
-  const [tenantMap, skillsMap, mutualMap, headlineMap, followingSet] = await Promise.all([
+  const [tenantMap, skillsMap, mutualMap, identityMap, followingSet] = await Promise.all([
     loadTenantNameMap(tenantIds),
     loadSkillsForUsers(ids),
     options.includeMutual !== false ? computeMutualCountsBatch(viewerId, ids) : Promise.resolve(new Map()),
-    loadHeadlineForUsers(users),
+    loadAcademicIdentityForUsers(users),
     options.includeFollow !== false ? loadFollowingSet(viewerId, ids) : Promise.resolve(new Set()),
   ]);
 
   return list.map((u) => {
     const tid = u.tenant_id ? String(u.tenant_id) : null;
     const college = tid && tenantMap.has(tid) ? tenantMap.get(tid).name : null;
+    const identity = identityMap.get(String(u.id));
     return baseNetworkUserShape(u, {
       college_name: college,
-      headline: headlineMap.get(String(u.id)) || null,
+      headline: identity?.academic_identity || null,
+      academic_identity: identity?.academic_identity || null,
+      professional_identity: identity?.professional_identity || null,
+      company: identity?.company || null,
+      position: identity?.position || null,
+      degree: identity?.degree || null,
+      branch: identity?.branch || null,
+      academic_year: identity?.academic_year || null,
+      graduation_batch: identity?.graduation_batch || null,
+      designation: identity?.designation || null,
+      department: identity?.department || null,
       skills: skillsMap.get(String(u.id)) || [],
       mutual_connections: mutualMap.get(String(u.id)) || 0,
       presence_status: derivePresenceStatus(u, true),

@@ -56,6 +56,39 @@ export function formatCountLabel(count, singular, plural = `${singular}s`) {
   return `${n.toLocaleString()} ${word}`;
 }
 
+export function formatCompactCount(n) {
+  const value = Number(n) || 0;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(value);
+}
+
+export function communityInitials(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  if (parts.length === 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+export function getCommunityTheme(category) {
+  const key = String(category || 'general').toLowerCase();
+  if (['engineering', 'science'].includes(key)) return 'teal';
+  if (['technology', 'tech'].includes(key)) return 'sky';
+  if (['business', 'education'].includes(key)) return 'emerald';
+  if (['arts', 'interest', 'general'].includes(key)) return 'purple';
+  return 'violet';
+}
+
+export function formatCategoryLabel(category) {
+  const raw = String(category || '').trim();
+  if (!raw) return 'Community';
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function canModerateCommunity(community) {
   return community?.role === 'admin' || community?.role === 'moderator';
 }

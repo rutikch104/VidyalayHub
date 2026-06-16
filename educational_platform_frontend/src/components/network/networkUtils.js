@@ -15,6 +15,19 @@ export const ROLE_FILTERS = [
   { value: 'staff', label: 'Staff' },
 ];
 
+export const DISCOVER_PAGE_SIZE = 30;
+
+export const DISCOVER_ADVANCED_FILTERS = [
+  { key: 'degree', label: 'Degree', placeholder: 'e.g. B.Tech' },
+  { key: 'branch', label: 'Branch', placeholder: 'e.g. Computer Engineering' },
+  { key: 'department', label: 'Department', placeholder: 'e.g. CSE' },
+  { key: 'academic_year', label: 'Academic year', placeholder: 'e.g. 3rd Year' },
+  { key: 'batch', label: 'Batch', placeholder: 'e.g. 2022 Batch' },
+  { key: 'company', label: 'Company', placeholder: 'e.g. TCS' },
+  { key: 'designation', label: 'Designation', placeholder: 'e.g. Software Engineer' },
+  { key: 'college', label: 'College', placeholder: 'e.g. RCPIT' },
+];
+
 export function roleLabel(userType) {
   switch (userType) {
     case 'student':
@@ -57,8 +70,18 @@ export function formatTimeAgo(dateString) {
   return `${Math.floor(diffInSeconds / 2592000)}mo ago`;
 }
 
+function resolvePeerUser(raw, options = {}) {
+  if (options.connectionDirection === 'outgoing' && raw.receiver) {
+    return raw.receiver;
+  }
+  if (options.connectionDirection === 'incoming' && raw.sender) {
+    return raw.sender;
+  }
+  return raw.sender || raw.receiver || raw;
+}
+
 export function normalizePerson(raw, options = {}) {
-  const user = raw.sender || raw.receiver || raw;
+  const user = resolvePeerUser(raw, options);
   const userPk = String(user?.id || raw.id || '');
   const id = userPk;
   const fullName =
@@ -71,13 +94,27 @@ export function normalizePerson(raw, options = {}) {
     userId: userPk,
     connectionId: raw.connection_id || options.connectionId || null,
     name: fullName,
-    title: raw.headline || roleLabel(user?.user_type || raw.user_type),
+    title: (raw.academic_identity && raw.academic_identity !== roleLabel(user?.user_type || raw.user_type))
+      ? raw.academic_identity
+      : (raw.headline && raw.headline !== roleLabel(user?.user_type || raw.user_type))
+        ? raw.headline
+        : roleLabel(user?.user_type || raw.user_type),
+    academic_identity: raw.academic_identity || null,
+    professional_identity: raw.professional_identity || null,
+    company: raw.company || null,
+    position: raw.position || null,
+    branch: raw.branch || null,
+    degree: raw.degree || null,
     role: user?.user_type || raw.user_type,
     college: raw.college_name || null,
     location: raw.location || user?.location || null,
     bio: raw.bio || user?.bio || null,
     avatar: user?.profile_picture || raw.profile_picture || null,
     mutualConnections: raw.mutual_connections ?? 0,
+    mutualFollowers: raw.mutual_followers ?? 0,
+    sharedSkillsCount: raw.shared_skills_count ?? 0,
+    sharedCommunitiesCount: raw.shared_communities_count ?? 0,
+    suggestionScore: raw.suggestion_score ?? null,
     suggestionReasons: raw.suggestion_reasons || [],
     presence: raw.presence_status || 'offline',
     isFollowing: Boolean(raw.is_following),
@@ -92,6 +129,7 @@ export function normalizePerson(raw, options = {}) {
           : raw.direction) ||
       null,
     skills: raw.skills || [],
+    isVerified: Boolean(raw.is_verified || user?.is_verified),
     message: raw.message || null,
     requestDate: raw.requested_at || raw.created_at || null,
     connectedAt: raw.responded_at || null,
@@ -112,8 +150,8 @@ export const EMPTY_COPY = {
     body: 'Requests you send will show up here until they respond.',
   },
   discover: {
-    title: 'Search the network',
-    body: 'Find people by name, college, skills, or role.',
+    title: 'No people match your search',
+    body: 'Try different keywords or clear filters to browse the full campus directory.',
   },
   suggestions: {
     title: 'No suggestions right now',

@@ -2,6 +2,8 @@ const db = require('../database/index');
 const { Op } = require('sequelize');
 const { mergeTenantWhere, denyIfCrossTenant, isPlatformUser } = require('../utils/tenantScope');
 const NotificationService = require('../services/notificationService');
+const { enrichNotificationsWithActors } = require('../utils/notificationEnrichment');
+const { resolveNotificationTarget } = require('../utils/notificationTargetResolver');
 
 function respondIfCrossTenant(res, req, resource) {
   const denial = denyIfCrossTenant(req, resource?.tenant_id);
@@ -52,7 +54,8 @@ exports.getUserNotifications = async (req, res) => {
       limit: lim
     });
 
-    const notifications = rows.map((n) => formatNotificationRow(n));
+    const formatted = rows.map((n) => formatNotificationRow(n));
+    const notifications = await enrichNotificationsWithActors(formatted);
     const pages = Math.ceil(count / lim) || 1;
 
     return res.status(200).json({
@@ -75,6 +78,41 @@ exports.getUserNotifications = async (req, res) => {
       status: false,
       message: 'Error fetching notifications.',
       error: err.message
+    });
+  }
+};
+
+// Resolve deep-link navigation target for a notification
+exports.resolveNotificationTarget = async (req, res) => {
+  const { notification_id } = req.params;
+  const user_id = req.user.id;
+
+  try {
+    const notification = await db.Notification.findOne({
+      where: mergeTenantWhere({ id: notification_id, user_id }, req.user),
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        status: false,
+        message: 'Notification not found.',
+      });
+    }
+    if (respondIfCrossTenant(res, req, notification)) return;
+
+    const plain = formatNotificationRow(notification);
+    const [enriched] = await enrichNotificationsWithActors([plain]);
+    const resolved = await resolveNotificationTarget(enriched);
+
+    return res.status(200).json({
+      status: true,
+      data: resolved,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: false,
+      message: 'Error resolving notification target.',
+      error: err.message,
     });
   }
 };

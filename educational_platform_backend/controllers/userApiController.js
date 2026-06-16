@@ -15,6 +15,14 @@ const {
 const { recordMediaAsset } = require('../services/mediaAssetService');
 const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
 const { enrichUserWithTenantBranding, loadTenantBrandingById } = require('../utils/tenantBranding');
+const skillsService = require('../services/skillsService');
+const {
+  buildAcademicIdentityFromRecord,
+  buildAcademicIdentityFields,
+  loadAcademicIdentityForUsers,
+} = require('../utils/academicIdentity');
+const { normalizeAlumniWorkExperience } = require('../utils/alumniProfileHelpers');
+const { loadTenantNameMap } = require('../utils/networkHelpers');
 
 async function countAcceptedConnections(userId) {
   return db.Connection.count({
@@ -279,6 +287,13 @@ async function buildProfilePayload(userRecord, options = {}) {
     Math.round((completionFields.length / 8) * 100)
   );
 
+  const appSettings =
+    u.app_settings && typeof u.app_settings === 'object' ? u.app_settings : {};
+  const academicExtra =
+    appSettings.academic_extra && typeof appSettings.academic_extra === 'object'
+      ? appSettings.academic_extra
+      : {};
+
   const body = {
     id: String(u.id),
     first_name: u.first_name || '',
@@ -311,10 +326,18 @@ async function buildProfilePayload(userRecord, options = {}) {
     username: profileHandleFromUser(u),
     profile_views: 0,
     post_views: 0,
-    enrollment_year: sd?.year ? parseInt(String(sd.year), 10) : undefined,
-    current_semester: sd?.semester ? parseInt(String(sd.semester), 10) : undefined,
-    course: sd?.stream || null,
-    department: sd?.degree || null,
+    enrollment_year: sd?.year && /^\d{4}$/.test(String(sd.year)) ? parseInt(String(sd.year), 10) : undefined,
+    student_year: sd?.year || null,
+    current_semester: sd?.semester || null,
+    passout_year: sd?.passout_date ? new Date(sd.passout_date).getFullYear() : null,
+    course: sd?.stream || ad?.stream || null,
+    department: sd?.degree || ad?.degree || null,
+    graduation_year: ad?.graduation_year || null,
+    academic_batch: sd?.academic_batch || ad?.academic_batch || null,
+    designation: td?.designation || null,
+    teacher_department: td?.department || null,
+    academic_year: sd?.year || null,
+    branch: sd?.stream || ad?.stream || null,
     university: null,
     company,
     position,
@@ -328,8 +351,46 @@ async function buildProfilePayload(userRecord, options = {}) {
     is_premium: false,
     is_verified: false,
     profile_completion,
+    onboarding_completed: !!appSettings.onboarding_completed,
+    onboarding_step: Number(appSettings.onboarding_step) || 0,
+    college_email: appSettings.college_email || null,
+    academic_extra: academicExtra,
     created_at: u.created_at,
   };
+
+  if (u.tenant_id) {
+    const tenantBrand = await loadTenantBrandingById(u.tenant_id);
+    if (tenantBrand) {
+      body.tenant_id = tenantBrand.tenant_id;
+      body.tenant_name = tenantBrand.name;
+      body.tenant_logo_url = tenantBrand.logo_url;
+      body.university = tenantBrand.name;
+    }
+  }
+
+  const identityFields = buildAcademicIdentityFields(
+    u.user_type,
+    sd,
+    td,
+    ad,
+    body.tenant_name || null,
+  );
+  body.academic_identity = identityFields.academic_identity;
+  body.professional_identity = identityFields.professional_identity;
+  body.degree = identityFields.degree;
+  body.branch = identityFields.branch;
+  body.academic_year = identityFields.academic_year;
+  body.graduation_batch = identityFields.graduation_batch;
+  if (identityFields.designation) body.designation = identityFields.designation;
+  if (identityFields.department && u.user_type === 'teacher') {
+    body.teacher_department = identityFields.department;
+  }
+  if (identityFields.company) body.company = identityFields.company;
+  if (identityFields.position) body.position = identityFields.position;
+
+  if (!body.academic_identity) {
+    body.academic_identity = buildAcademicIdentityFromRecord(u);
+  }
 
   const privacy = deepMerge(
     DEFAULT_PRIVACY,
@@ -344,16 +405,6 @@ async function buildProfilePayload(userRecord, options = {}) {
   } else {
     if (privacy.show_email) body.email = u.email;
     if (privacy.show_phone) body.phone = u.phone_number || null;
-  }
-
-  if (u.tenant_id) {
-    const tenantBrand = await loadTenantBrandingById(u.tenant_id);
-    if (tenantBrand) {
-      body.tenant_id = tenantBrand.tenant_id;
-      body.tenant_name = tenantBrand.name;
-      body.tenant_logo_url = tenantBrand.logo_url;
-      body.university = tenantBrand.name;
-    }
   }
 
   if (viewerId && String(viewerId) !== String(u.id)) {
@@ -414,9 +465,11 @@ async function buildProfilePayload(userRecord, options = {}) {
       body.experience_list = exps
         .map((e) => experienceService.mapExperienceForApi(e))
         .sort(experienceService.compareExperienceRows);
-      const summary = body.experience_list
-        .map((e) => `${e.title}${e.company ? ` @ ${e.company}` : ''}${e.duration ? ` (${e.duration})` : ''}`)
-        .join(' · ');
+      const summary = [...new Set(
+        body.experience_list.map(
+          (e) => `${e.title}${e.company ? ` @ ${e.company}` : ''}${e.duration ? ` (${e.duration})` : ''}`,
+        ),
+      )].join(' · ');
       if (summary) body.experience = summary;
     } else {
       body.experience_list = [];
@@ -608,7 +661,7 @@ exports.updateProfile = async (req, res) => {
       const dUp = {};
       if (company !== undefined) dUp.company_name = company;
       if (position !== undefined) dUp.current_job_title = position;
-      if (experience !== undefined) dUp.work_experience = experience;
+      if (experience !== undefined) dUp.work_experience = normalizeAlumniWorkExperience(experience);
       if (Object.keys(dUp).length) await detail.update(dUp);
     }
 
@@ -623,6 +676,180 @@ exports.updateProfile = async (req, res) => {
     const body = await buildProfilePayload(user, { includePrivate: true });
     return res.status(200).json({ status: true, data: body, message: 'Profile updated.' });
   } catch (e) {
+    return res.status(500).json({ status: false, message: e.message });
+  }
+};
+
+exports.updateOnboardingProfile = async (req, res) => {
+  try {
+    const user = await db.User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+
+    const {
+      step,
+      complete,
+      skip,
+      bio,
+      location,
+      phone_number,
+      linkedin_url,
+      github_url,
+      website_url,
+      degree,
+      branch,
+      year,
+      semester,
+      graduation_year,
+      roll_number,
+      university_name,
+      student_id,
+      cgpa,
+      percentage,
+      admission_year,
+      company,
+      position,
+      industry,
+      experience,
+      department,
+      designation,
+      qualification,
+      employee_id,
+      faculty_id,
+      joining_date,
+      teaching_experience,
+      research_areas,
+      skills,
+    } = req.body;
+
+    const userUpdates = {};
+    if (bio !== undefined) userUpdates.bio = bio || null;
+    if (location !== undefined) userUpdates.location = location || null;
+    if (phone_number !== undefined) userUpdates.phone_number = phone_number || null;
+    if (linkedin_url !== undefined) userUpdates.linkedin_url = linkedin_url || null;
+    if (github_url !== undefined) userUpdates.github_url = github_url || null;
+    if (website_url !== undefined) userUpdates.website_url = website_url || null;
+    if (Object.keys(userUpdates).length) {
+      await user.update(userUpdates);
+    }
+
+    if (user.user_type === 'student') {
+      const [detail] = await db.StudentDetail.findOrCreate({ where: { user_id: user.id } });
+      const dUp = {};
+      if (degree !== undefined) dUp.degree = degree || null;
+      if (branch !== undefined) dUp.stream = branch || null;
+      if (year !== undefined) dUp.year = year || null;
+      if (semester !== undefined) dUp.semester = semester || null;
+      if (graduation_year !== undefined) {
+        const yr = String(graduation_year || '').trim();
+        dUp.passout_date = yr && /^\d{4}$/.test(yr) ? new Date(`${yr}-06-01`) : null;
+      }
+      if (Object.keys(dUp).length) await detail.update(dUp);
+    }
+
+    if (user.user_type === 'alumni') {
+      const [detail] = await db.AlumniDetail.findOrCreate({ where: { user_id: user.id } });
+      const dUp = {};
+      if (degree !== undefined) dUp.degree = degree || null;
+      if (branch !== undefined) dUp.stream = branch || null;
+      if (roll_number !== undefined) dUp.roll_number = roll_number || null;
+      if (graduation_year !== undefined) {
+        const yr = String(graduation_year || '').trim();
+        dUp.year_of_graduation = yr && /^\d{4}$/.test(yr) ? new Date(`${yr}-06-01`) : null;
+      }
+      if (company !== undefined) dUp.company_name = company || null;
+      if (position !== undefined) dUp.current_job_title = position || null;
+      if (industry !== undefined) dUp.industry = industry || null;
+      if (experience !== undefined) dUp.work_experience = normalizeAlumniWorkExperience(experience);
+      if (linkedin_url !== undefined) dUp.linkedin_profile = linkedin_url || null;
+      if (github_url !== undefined) dUp.github_portfolio = github_url || null;
+      if (Object.keys(dUp).length) await detail.update(dUp);
+    }
+
+    if (user.user_type === 'teacher') {
+      const [detail] = await db.TeacherDetail.findOrCreate({ where: { user_id: user.id } });
+      const dUp = {};
+      if (department !== undefined) dUp.department = department || null;
+      if (designation !== undefined) dUp.designation = designation || null;
+      if (qualification !== undefined) dUp.qualification = qualification || null;
+      if (joining_date !== undefined) dUp.joining_date = joining_date || null;
+      if (teaching_experience !== undefined) {
+        dUp.years_of_experience = teaching_experience || null;
+        const yrs = parseInt(String(teaching_experience), 10);
+        if (!Number.isNaN(yrs)) dUp.experience_years = yrs;
+      }
+      if (research_areas !== undefined) dUp.research_interests = research_areas || null;
+      if (linkedin_url !== undefined) dUp.linkedin_profile = linkedin_url || null;
+      if (Object.keys(dUp).length) await detail.update(dUp);
+    }
+
+    if (Array.isArray(skills)) {
+      for (const raw of skills.slice(0, 12)) {
+        const skill_name = String(raw || '').trim();
+        if (!skill_name) continue;
+        try {
+          await skillsService.assignSkillToUser(user.id, { skill_name });
+        } catch (skillErr) {
+          console.warn('onboarding skill assign', skillErr.message);
+        }
+      }
+    }
+
+    let app = user.app_settings && typeof user.app_settings === 'object' ? { ...user.app_settings } : {};
+    const academicExtra = {
+      ...(app.academic_extra && typeof app.academic_extra === 'object' ? app.academic_extra : {}),
+    };
+    if (university_name !== undefined) academicExtra.university_name = university_name || null;
+    if (student_id !== undefined) academicExtra.student_id = student_id || null;
+    if (roll_number !== undefined && user.user_type === 'student') {
+      academicExtra.roll_number = roll_number || null;
+    }
+    if (cgpa !== undefined) academicExtra.cgpa = cgpa || null;
+    if (percentage !== undefined) academicExtra.percentage = percentage || null;
+    if (admission_year !== undefined) academicExtra.admission_year = admission_year || null;
+    if (graduation_year !== undefined) {
+      const yr = String(graduation_year || '').trim();
+      academicExtra.graduation_year = yr || null;
+    }
+    if (employee_id !== undefined) academicExtra.employee_id = employee_id || null;
+    if (faculty_id !== undefined) academicExtra.faculty_id = faculty_id || null;
+    if (industry !== undefined) academicExtra.industry = industry || null;
+    if (qualification !== undefined && user.user_type === 'teacher') {
+      academicExtra.qualification = qualification || null;
+    }
+    if (teaching_experience !== undefined) {
+      academicExtra.teaching_experience = teaching_experience || null;
+    }
+    if (research_areas !== undefined) {
+      academicExtra.research_areas = research_areas || null;
+    }
+    app.academic_extra = academicExtra;
+
+    if (step !== undefined) app.onboarding_step = Math.max(0, parseInt(String(step), 10) || 0);
+    if (complete || skip) {
+      app.onboarding_completed = true;
+      app.onboarding_completed_at = new Date().toISOString();
+    }
+
+    await user.update({ app_settings: app });
+
+    await user.reload({
+      include: [
+        { model: db.StudentDetail, as: 'studentDetails', required: false },
+        { model: db.TeacherDetail, as: 'teacherDetails', required: false },
+        { model: db.AlumniDetail, as: 'alumniDetails', required: false },
+      ],
+    });
+
+    const body = await buildProfilePayload(user, { includePrivate: true });
+    return res.status(200).json({
+      status: true,
+      data: body,
+      message: skip ? 'You can complete your profile anytime from Settings.' : 'Profile updated.',
+    });
+  } catch (e) {
+    console.error('updateOnboardingProfile', e);
     return res.status(500).json({ status: false, message: e.message });
   }
 };
@@ -1151,7 +1378,34 @@ exports.searchUsers = async (req, res) => {
       offset,
     });
 
-    const users = rows.map((u) => searchUserPublicShape(u));
+    const users = await Promise.all(
+      rows.map(async (u) => {
+        const shaped = searchUserPublicShape(u);
+        return shaped;
+      }),
+    );
+
+    const identityMap = await loadAcademicIdentityForUsers(rows);
+    const tenantMap = await loadTenantNameMap(rows.map((u) => u.tenant_id));
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const u = rows[i];
+      const shaped = users[i];
+      const identity = identityMap.get(String(u.id));
+      if (identity?.academic_identity) {
+        shaped.academic_identity = identity.academic_identity;
+        shaped.headline = identity.academic_identity;
+      }
+      if (identity?.professional_identity) {
+        shaped.professional_identity = identity.professional_identity;
+      }
+      if (identity?.company) shaped.company = identity.company;
+      if (identity?.position) shaped.position = identity.position;
+      const tid = u.tenant_id ? String(u.tenant_id) : null;
+      if (tid && tenantMap.has(tid)) {
+        shaped.college_name = tenantMap.get(tid).name;
+      }
+    }
 
     return res.status(200).json({
       status: true,

@@ -2,6 +2,12 @@ const bcrypt = require('bcrypt');
 const db = require('../database/index');
 const { Op } = require('sequelize');
 const { ilikeContainsPattern } = require('../utils/searchQuery');
+const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
+const {
+  descriptorFromMulterFile,
+  replaceStoredMedia,
+} = require('../services/mediaUploadService');
+const { recordMediaAsset } = require('../services/mediaAssetService');
 
 const TENANT_TYPES = new Set(['University', 'Engineering', 'Arts College']);
 
@@ -72,6 +78,8 @@ async function formatSuperCollege(t) {
     type: j.type || 'University',
     location: j.affiliation || '',
     domain: j.website || '',
+    logo_url: j.logo_url ? resolveMediaUrl(j.logo_url) : null,
+    logo_storage_key: j.logo_url || null,
     admin: { name: adm.name, email: adm.email, phone: adm.phone || '' },
     users: { students, teachers, staff },
     subscription: {
@@ -187,7 +195,7 @@ exports.getCollege = async (req, res) => {
 
 exports.createCollege = async (req, res) => {
   try {
-    const { name, type, location, domain, admin_name, admin_email } = req.body;
+    const { name, type, location, domain } = req.body;
     const row = await db.Tenant.create({
       name: name || 'New institution',
       type: normalizeTenantType(type),
@@ -195,6 +203,24 @@ exports.createCollege = async (req, res) => {
       website: normalizeWebsite(domain),
       status: 'pending',
     });
+
+    // If a logo file was uploaded alongside the form, store and attach it.
+    if (req.file) {
+      try {
+        const descriptor = await descriptorFromMulterFile(req.file, 'tenantLogo');
+        await row.update({ logo_url: descriptor.url });
+        void recordMediaAsset(descriptor, {
+          ownerId: req.user?.id || null,
+          category: 'tenantLogo',
+          entityType: 'tenant',
+          entityId: row.tenant_id,
+        });
+      } catch (e) {
+        // Don't fail college creation if logo storage fails — surface a warning instead.
+        console.warn('createCollege: logo storage failed', e?.message || e);
+      }
+    }
+
     return res.status(201).json({ status: true, data: await formatSuperCollege(row) });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
@@ -217,8 +243,80 @@ exports.updateCollege = async (req, res) => {
       if (dbS) updates.status = dbS;
     }
     if (Object.keys(updates).length) await t.update(updates);
+
+    // Optional logo replacement on multipart updates.
+    if (req.file) {
+      try {
+        await replaceStoredMedia(t.logo_url);
+        const descriptor = await descriptorFromMulterFile(req.file, 'tenantLogo');
+        await t.update({ logo_url: descriptor.url });
+        void recordMediaAsset(descriptor, {
+          ownerId: req.user?.id || null,
+          category: 'tenantLogo',
+          entityType: 'tenant',
+          entityId: t.tenant_id,
+        });
+      } catch (e) {
+        console.warn('updateCollege: logo storage failed', e?.message || e);
+      }
+    }
+
     await t.reload();
     return res.status(200).json({ status: true, data: await formatSuperCollege(t) });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
+/**
+ * Dedicated logo upload — for replacing a logo after the college already exists.
+ * Expects multipart with a single `logo` file field.
+ */
+exports.uploadCollegeLogo = async (req, res) => {
+  try {
+    const id = req.params.collegeId;
+    const t = await db.Tenant.findByPk(id);
+    if (!t) return res.status(404).json({ status: false, message: 'Not found' });
+    if (!req.file) {
+      return res.status(400).json({ status: false, message: 'No logo file uploaded.' });
+    }
+    await replaceStoredMedia(t.logo_url);
+    const descriptor = await descriptorFromMulterFile(req.file, 'tenantLogo');
+    await t.update({ logo_url: descriptor.url });
+    void recordMediaAsset(descriptor, {
+      ownerId: req.user?.id || null,
+      category: 'tenantLogo',
+      entityType: 'tenant',
+      entityId: t.tenant_id,
+    });
+    await t.reload();
+    return res.status(200).json({
+      status: true,
+      message: 'Logo updated.',
+      data: await formatSuperCollege(t),
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ status: false, message: err.message });
+  }
+};
+
+/** Clear a college's logo (revert to the platform fallback). */
+exports.removeCollegeLogo = async (req, res) => {
+  try {
+    const id = req.params.collegeId;
+    const t = await db.Tenant.findByPk(id);
+    if (!t) return res.status(404).json({ status: false, message: 'Not found' });
+    if (t.logo_url) {
+      await replaceStoredMedia(t.logo_url);
+      await t.update({ logo_url: null });
+      await t.reload();
+    }
+    return res.status(200).json({
+      status: true,
+      message: 'Logo removed.',
+      data: await formatSuperCollege(t),
+    });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }

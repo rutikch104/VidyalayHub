@@ -40,6 +40,13 @@ const CATEGORIES = {
     maxFileSize: parseInt(process.env.UPLOAD_MAX_COVER_BYTES || String(8 * 1024 * 1024), 10),
     allowedMimePrefixes: ['image/'],
   },
+  tenantLogo: {
+    subdir: 'tenants/logos',
+    maxFiles: 1,
+    maxFileSize: parseInt(process.env.UPLOAD_MAX_TENANT_LOGO_BYTES || String(5 * 1024 * 1024), 10),
+    allowedMimePrefixes: ['image/'],
+    allowedMimeTypes: ['image/svg+xml'],
+  },
   message: {
     subdir: 'messages',
     maxFiles: 1,
@@ -79,6 +86,17 @@ const CATEGORIES = {
     allowedMimeTypes: [
       'application/pdf',
       'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+  },
+  verification: {
+    subdir: 'registration/verification',
+    maxFiles: 5,
+    maxFileSize: parseInt(process.env.UPLOAD_MAX_VERIFICATION_BYTES || String(5 * 1024 * 1024), 10),
+    allowedMimePrefixes: ['image/'],
+    allowedMimeTypes: [
+      'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ],

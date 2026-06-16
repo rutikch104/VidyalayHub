@@ -110,6 +110,14 @@ class NotificationService {
             action,
         });
     }
+    async resolveNotificationTarget(notificationId) {
+        const response = await api.get(`/notifications/${notificationId}/target`);
+        const body = response.data;
+        if (body?.status && body.data) {
+            return body.data;
+        }
+        return null;
+    }
 }
 export default new NotificationService();
 export { emitNotificationsChanged } from '@/utils/shellEvents';

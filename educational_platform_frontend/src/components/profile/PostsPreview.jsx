@@ -1,5 +1,5 @@
 import { FileText, ChevronRight } from 'lucide-react';
-import PostCard from '@/components/PostCard';
+import FeedPostCard from '@/components/posts/FeedPostCard';
 import { pp } from '@/components/profile/premium/profileTokens';
 import { EduSectionCard } from '@/components/profile/eduConnect/primitives';
 import ProfileEmptyState from '@/components/profile/premium/ProfileEmptyState';
@@ -34,7 +34,7 @@ export default function PostsPreview({
   onNavigate,
   maxPosts = DEFAULT_PREVIEW_COUNT,
   hideViewAll = false,
-  subtitle = 'Recent posts and updates',
+  subtitle = 'Posts, amplifies, and updates',
   emptyHint = 'Create a post from the home feed.',
 }) {
   const list = (posts || []).filter(Boolean);
@@ -59,8 +59,8 @@ export default function PostsPreview({
                   className={pp.feedItem}
                   style={{ animationDelay: `${Math.min(idx, 5) * 40}ms` }}
                 >
-                  <PostCard
-                    post={post}
+                  <FeedPostCard
+                    item={post}
                     onPostDeleted={onPostDeleted}
                     onPostEdited={onPostEdited}
                     onNavigate={onNavigate}

@@ -54,7 +54,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
         },
         work_experience: {
-            type: DataTypes.STRING(50),
+            type: DataTypes.TEXT,
             allowNull: true,
         },
         skills: {
@@ -130,6 +130,54 @@ module.exports = (sequelize, DataTypes) => {
         },
         profile_picture: {
             type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        alumni_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        admission_year: {
+            type: DataTypes.SMALLINT,
+            allowNull: true,
+        },
+        graduation_year: {
+            type: DataTypes.SMALLINT,
+            allowNull: true,
+        },
+        final_cgpa: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        final_percentage: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        current_location: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        id_document_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        graduation_certificate_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        academic_batch: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        college_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        student_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        university_reg_number: {
+            type: DataTypes.STRING(100),
             allowNull: true,
         },
         created_at: {

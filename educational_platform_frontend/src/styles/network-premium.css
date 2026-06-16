@@ -1,0 +1,200 @@
+/* Premium My Network — stats + connection profile cards */
+
+@layer components {
+  /* ── Network statistics ── */
+  .net-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.875rem;
+  }
+
+  @media (min-width: 640px) {
+    .net-stats-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  .net-stat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    overflow: hidden;
+    border-radius: 1.25rem;
+    border: 1px solid hsl(var(--border) / 0.55);
+    background: hsl(var(--card));
+    padding: 1.25rem 1.125rem 1.0625rem;
+    min-height: 7.5rem;
+    text-align: left;
+    cursor: default;
+    transition:
+      transform 280ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 280ms ease;
+  }
+
+  button.net-stat-card {
+    cursor: pointer;
+  }
+
+  button.net-stat-card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.22);
+  }
+
+  .net-stat-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 280ms ease;
+    pointer-events: none;
+  }
+
+  .net-stat-card:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--border) / 0.85);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.55) inset,
+      0 14px 32px -16px hsl(222 47% 11% / 0.2);
+  }
+
+  .net-stat-card:hover::before {
+    opacity: 1;
+  }
+
+  .net-stat-card--active {
+    border-color: hsl(var(--primary) / 0.35);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.55) inset,
+      0 10px 28px -14px hsl(var(--primary) / 0.22);
+  }
+
+  .net-stat-card--sky {
+    background: linear-gradient(145deg, oklch(0.98 0.02 230), hsl(var(--card)) 55%);
+  }
+  .net-stat-card--sky::before {
+    background: linear-gradient(135deg, oklch(0.62 0.14 230 / 0.12), transparent 65%);
+  }
+  .net-stat-card--sky .net-stat-card__icon-wrap {
+    background: oklch(0.94 0.04 230);
+    color: oklch(0.45 0.12 230);
+  }
+  .net-stat-card--sky .net-stat-card__value {
+    color: oklch(0.38 0.1 230);
+  }
+
+  .net-stat-card--emerald {
+    background: linear-gradient(145deg, oklch(0.98 0.02 155), hsl(var(--card)) 55%);
+  }
+  .net-stat-card--emerald::before {
+    background: linear-gradient(135deg, oklch(0.62 0.14 155 / 0.12), transparent 65%);
+  }
+  .net-stat-card--emerald .net-stat-card__icon-wrap {
+    background: oklch(0.94 0.04 155);
+    color: oklch(0.42 0.12 155);
+  }
+  .net-stat-card--emerald .net-stat-card__value {
+    color: oklch(0.36 0.1 155);
+  }
+
+  .net-stat-card--amber {
+    background: linear-gradient(145deg, oklch(0.99 0.02 75), hsl(var(--card)) 55%);
+  }
+  .net-stat-card--amber::before {
+    background: linear-gradient(135deg, oklch(0.72 0.14 75 / 0.14), transparent 65%);
+  }
+  .net-stat-card--amber .net-stat-card__icon-wrap {
+    background: oklch(0.95 0.05 75);
+    color: oklch(0.48 0.12 65);
+  }
+  .net-stat-card--amber .net-stat-card__value {
+    color: oklch(0.42 0.11 65);
+  }
+
+  .net-stat-card--violet {
+    background: linear-gradient(145deg, oklch(0.98 0.02 295), hsl(var(--card)) 55%);
+  }
+  .net-stat-card--violet::before {
+    background: linear-gradient(135deg, oklch(0.58 0.16 295 / 0.12), transparent 65%);
+  }
+  .net-stat-card--violet .net-stat-card__icon-wrap {
+    background: oklch(0.94 0.04 295);
+    color: oklch(0.46 0.14 295);
+  }
+  .net-stat-card--violet .net-stat-card__value {
+    color: oklch(0.4 0.12 295);
+  }
+
+  .net-stat-card__icon-wrap {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: inline-flex;
+    height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    box-shadow: 0 1px 2px hsl(222 47% 11% / 0.06);
+    opacity: 0.92;
+  }
+
+  .net-stat-card__icon-wrap svg {
+    height: 1.0625rem;
+    width: 1.0625rem;
+    stroke-width: 2.25;
+  }
+
+  .net-stat-card__value {
+    padding-right: 2.5rem;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(1.75rem, 4vw, 2rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .net-stat-card__label {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: hsl(var(--foreground));
+  }
+
+  .net-stat-card__desc {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Network person cards use .home-profile-card--network (see home-profile-card.css) */
+
+  .net-people-grid {
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .net-people-grid {
+      gap: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .net-people-grid {
+      gap: 1.625rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .net-stat-card {
+      padding: 1rem;
+    }
+  }
+}

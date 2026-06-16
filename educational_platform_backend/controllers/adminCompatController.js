@@ -2,6 +2,8 @@ const bcrypt = require('bcrypt');
 const db = require('../database/index');
 const { Op } = require('sequelize');
 const { ilikeContainsPattern } = require('../utils/searchQuery');
+const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
+const { registrationStatusLabel } = require('../services/campusRegistrationService');
 
 const TENANT_TYPES = new Set(['University', 'Engineering', 'Arts College']);
 
@@ -123,6 +125,9 @@ exports.getAdminStats = async (req, res) => {
     const pending_teacher_registrations = await db.User.count({
       where: { user_type: 'teacher', is_approved: false, ...tw },
     });
+    const pending_alumni_registrations = await db.User.count({
+      where: { user_type: 'alumni', is_approved: false, ...tw },
+    });
 
     const monthAgo = new Date();
     monthAgo.setDate(monthAgo.getDate() - 30);
@@ -153,6 +158,9 @@ exports.getAdminStats = async (req, res) => {
         total_staff,
         pending_student_registrations,
         pending_teacher_registrations,
+        pending_alumni_registrations,
+        pending_registrations:
+          pending_student_registrations + pending_teacher_registrations + pending_alumni_registrations,
         active_sessions: 0,
         growth_metrics: {
           colleges_growth: newColleges,
@@ -312,33 +320,82 @@ exports.deleteCollege = async (req, res) => {
 function mapUser(u) {
   const j = u.toJSON ? u.toJSON() : u;
   const name = [j.first_name, j.last_name].filter(Boolean).join(' ') || j.email;
+  const sd = j.studentDetails || null;
+  const td = j.teacherDetails || null;
+  const ad = j.alumniDetails || null;
+  const regStatus = j.registration_status || (j.is_approved ? 'approved' : 'pending_approval');
+
   return {
     id: String(j.id),
     name,
     email: j.email,
-    rollNumber: '',
-    department: '',
-    year: '',
-    gpa: 0,
+    phone_number: j.phone_number || '',
+    college_email: j.college_email || j.app_settings?.college_email || '',
+    rollNumber: sd?.roll_number || ad?.roll_number || '',
+    className: sd?.division || '',
+    studentId: sd?.student_id || ad?.student_id || '',
+    alumniId: ad?.alumni_id || '',
+    collegeId: sd?.college_id || ad?.college_id || '',
+    universityRegNumber: sd?.university_reg_number || ad?.university_reg_number || '',
+    academicBatch: sd?.academic_batch || ad?.academic_batch || '',
+    department: sd?.degree || td?.department || ad?.degree || '',
+    branch: sd?.stream || ad?.stream || '',
+    year: sd?.year || '',
+    semester: sd?.semester ? (String(sd.semester).match(/^\d+$/) ? `Semester ${sd.semester}` : sd.semester) : '',
+    admissionYear: sd?.admission_year || ad?.admission_year || '',
+    graduationYear: sd?.expected_graduation_year || ad?.graduation_year || '',
+    designation: td?.designation || ad?.current_job_title || '',
+    company: ad?.company_name || '',
+    gpa: sd?.cgpa || ad?.final_cgpa || 0,
     status: j.is_approved ? 'Active' : 'Pending',
+    registration_status: regStatus,
+    registration_status_label: registrationStatusLabel(regStatus),
     joinDate: j.created_at,
-    avatar: j.profile_picture || '',
+    submitted_at: j.registration_submitted_at || j.created_at,
+    avatar: j.profile_picture ? resolveMediaUrl(j.profile_picture) : '',
     user_type: j.user_type,
     tenant_id: j.tenant_id != null ? String(j.tenant_id) : '',
-    position: '',
+    college_name: j.tenant?.name || '',
+    position: td?.designation || ad?.current_job_title || '',
     courses: [],
     joined: j.created_at,
+    documents: (j.registrationDocuments || []).map((doc) => ({
+      id: String(doc.id),
+      doc_type: doc.doc_type,
+      url: resolveMediaUrl(doc.storage_url) || doc.storage_url,
+      file_name: doc.file_name,
+      review_status: doc.review_status,
+    })),
   };
 }
 
 function applyUserStatusFilter(where, statusQuery) {
   if (!statusQuery || String(statusQuery) === 'All') return where;
   const s = String(statusQuery);
-  if (s === 'Active') return { ...where, is_approved: true };
-  if (s === 'Pending') return { ...where, is_approved: false };
-  if (s === 'Inactive' || s === 'Suspended') return { ...where, is_approved: false };
+  if (s === 'Active' || s === 'Approved') {
+    return { ...where, is_approved: true };
+  }
+  if (s === 'Pending' || s === 'Pending Approval') {
+    return {
+      ...where,
+      is_approved: false,
+      registration_status: { [Op.in]: ['pending_approval', 'under_review', 'needs_info'] },
+    };
+  }
+  if (s === 'Under Review') return { ...where, registration_status: 'under_review' };
+  if (s === 'Rejected') return { ...where, registration_status: 'rejected' };
+  if (s === 'Suspended') return { ...where, registration_status: 'suspended' };
+  if (s === 'Inactive') return { ...where, is_approved: false };
   return where;
 }
+
+const registrationUserIncludes = [
+  { model: db.StudentDetail, as: 'studentDetails', required: false },
+  { model: db.TeacherDetail, as: 'teacherDetails', required: false },
+  { model: db.AlumniDetail, as: 'alumniDetails', required: false },
+  { model: db.Tenant, as: 'tenant', attributes: ['name'], required: false },
+  { model: db.UserRegistrationDocument, as: 'registrationDocuments', required: false },
+];
 
 exports.getStudents = async (req, res) => {
   try {
@@ -368,6 +425,7 @@ exports.getStudents = async (req, res) => {
     const { count, rows } = await db.User.findAndCountAll({
       where,
       attributes: { exclude: ['password_hash'] },
+      include: registrationUserIncludes,
       offset,
       limit,
       order: [['created_at', 'DESC']],
@@ -412,6 +470,7 @@ exports.getTeachers = async (req, res) => {
     const { count, rows } = await db.User.findAndCountAll({
       where,
       attributes: { exclude: ['password_hash'] },
+      include: registrationUserIncludes,
       offset,
       limit,
       order: [['created_at', 'DESC']],
@@ -423,6 +482,67 @@ exports.getTeachers = async (req, res) => {
         pagination: { total: count, page, pages: Math.ceil(count / limit) || 1 },
       },
     });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
+exports.getAlumni = async (req, res) => {
+  try {
+    const page = parseInt(String(req.query.page), 10) || 1;
+    const limit = Math.min(100, parseInt(String(req.query.limit), 10) || 20);
+    const offset = (page - 1) * limit;
+    const where = applyUserStatusFilter(
+      { user_type: 'alumni', ...tenantWhereClause(req) },
+      req.query.status,
+    );
+    if (req.query.search) {
+      const pat = ilikeContainsPattern(req.query.search);
+      if (pat) {
+        where[Op.or] = [
+          { first_name: { [Op.iLike]: pat } },
+          { last_name: { [Op.iLike]: pat } },
+          { email: { [Op.iLike]: pat } },
+        ];
+      }
+    }
+    const { count, rows } = await db.User.findAndCountAll({
+      where,
+      attributes: { exclude: ['password_hash'] },
+      include: registrationUserIncludes,
+      offset,
+      limit,
+      order: [['created_at', 'DESC']],
+    });
+    return res.status(200).json({
+      status: true,
+      data: {
+        alumni: rows.map(mapUser),
+        pagination: { total: count, page, pages: Math.ceil(count / limit) || 1 },
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
+exports.getRegistrationApplication = async (req, res) => {
+  try {
+    const user = await db.User.findByPk(req.params.userId, {
+      attributes: { exclude: ['password_hash'] },
+      include: registrationUserIncludes,
+    });
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found.' });
+    }
+    if (req.adminTenantFilter && String(user.tenant_id) !== req.adminTenantFilter) {
+      return res.status(403).json({ status: false, message: 'Access denied.' });
+    }
+    const mapped = mapUser(user);
+    mapped.rejection_reason = user.registration_rejection_reason;
+    mapped.admin_notes = user.registration_admin_notes;
+    mapped.reviewed_at = user.registration_reviewed_at;
+    return res.status(200).json({ status: true, data: mapped });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }
@@ -528,7 +648,7 @@ exports.createUser = async (req, res) => {
 
 exports.updateUserStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, action, rejection_reason, admin_notes } = req.body;
     const user = await db.User.findByPk(req.params.userId);
     if (!user) {
       return res.status(404).json({ status: false, message: 'User not found' });
@@ -536,8 +656,50 @@ exports.updateUserStatus = async (req, res) => {
     if (req.adminTenantFilter && String(user.tenant_id) !== req.adminTenantFilter) {
       return res.status(403).json({ status: false, message: 'Access denied.' });
     }
-    await user.update({ is_approved: status === 'Active' || status === 'active' });
-    return res.status(200).json({ status: true, message: 'Updated' });
+
+    const normalized = String(action || status || '').toLowerCase();
+    const updates = {
+      registration_reviewed_at: new Date(),
+      registration_reviewed_by: req.user.id,
+    };
+
+    if (normalized === 'active' || normalized === 'approved' || normalized === 'approve') {
+      updates.is_approved = true;
+      updates.registration_status = 'approved';
+      updates.registration_rejection_reason = null;
+      updates.registration_admin_notes = admin_notes || null;
+    } else if (normalized === 'reject' || normalized === 'rejected') {
+      updates.is_approved = false;
+      updates.registration_status = 'rejected';
+      updates.registration_rejection_reason = rejection_reason || 'Registration rejected by college administration.';
+      updates.registration_admin_notes = admin_notes || null;
+    } else if (normalized === 'under_review' || normalized === 'under review') {
+      updates.is_approved = false;
+      updates.registration_status = 'under_review';
+      updates.registration_admin_notes = admin_notes || null;
+    } else if (normalized === 'needs_info' || normalized === 'request_info') {
+      updates.is_approved = false;
+      updates.registration_status = 'needs_info';
+      updates.registration_admin_notes = admin_notes || rejection_reason || 'Additional information required.';
+    } else if (normalized === 'suspended') {
+      updates.is_approved = false;
+      updates.registration_status = 'suspended';
+      updates.registration_admin_notes = admin_notes || null;
+    } else {
+      updates.is_approved = status === 'Active' || status === 'active';
+      if (updates.is_approved) updates.registration_status = 'approved';
+    }
+
+    await user.update(updates);
+    await user.reload();
+    return res.status(200).json({
+      status: true,
+      message: 'Registration review updated.',
+      data: {
+        registration_status: user.registration_status,
+        registration_status_label: registrationStatusLabel(user.registration_status),
+      },
+    });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }

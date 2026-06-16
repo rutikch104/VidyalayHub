@@ -155,6 +155,13 @@ module.exports = (sequelize, DataTypes) => {
         JobPost.belongsTo(models.Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
         JobPost.belongsTo(models.User, { foreignKey: 'posted_by', as: 'poster' });
         JobPost.hasMany(models.JobApplication, { foreignKey: 'job_id', as: 'applications' });
+        JobPost.hasMany(models.JobSkill, { foreignKey: 'job_id', as: 'jobSkills' });
+        JobPost.belongsToMany(models.Skill, {
+            through: models.JobSkill,
+            foreignKey: 'job_id',
+            otherKey: 'skill_id',
+            as: 'skills',
+        });
     };
 
     return JobPost;

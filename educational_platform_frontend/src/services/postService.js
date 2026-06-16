@@ -1,5 +1,6 @@
 // @ts-nocheck
 import api from './api';
+import { enrichSelfAuthorInPost } from '@/lib/selfIdentityCache';
 /** API origin without trailing `/api` — for `/uploads/...` media */
 export function getApiOrigin() {
     const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3030/api';
@@ -69,6 +70,12 @@ export function formatComment(c) {
     }
     const u = c.user;
     const replies = Array.isArray(c.replies) ? c.replies.map((r) => formatComment(r)) : [];
+    const collegeName =
+      u?.college_name?.trim() ||
+      u?.tenant_name?.trim() ||
+      u?.tenant?.name?.trim() ||
+      u?.tenant?.short_name?.trim() ||
+      '';
     return {
         ...c,
         replies,
@@ -82,6 +89,22 @@ export function formatComment(c) {
                 first_name: u.first_name,
                 last_name: u.last_name,
                 avatar_url: resolveMediaUrl(u.profile_picture || u.avatar_url),
+                user_type: u.user_type,
+                role: u.role,
+                title: u.title,
+                department: u.department,
+                major: u.major,
+                branch: u.branch,
+                degree: u.degree,
+                academic_identity: u.academic_identity,
+                professional_identity: u.professional_identity,
+                company: u.company,
+                position: u.position,
+                academic_year: u.academic_year,
+                graduation_batch: u.graduation_batch,
+                designation: u.designation,
+                college_name: collegeName || undefined,
+                tenant_name: collegeName || undefined,
             }
             : { id: '', name: 'User' },
     };
@@ -91,11 +114,22 @@ export function formatPostFromApi(postData) {
         return null;
     }
     const u = postData.user;
+    const collegeName =
+      u?.college_name?.trim() ||
+      u?.tenant_name?.trim() ||
+      u?.tenant?.name?.trim() ||
+      u?.tenant?.short_name?.trim() ||
+      postData.tenant?.name?.trim() ||
+      postData.tenant?.short_name?.trim() ||
+      '';
     const formattedUser = u
         ? {
             ...u,
             name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'User',
             avatar_url: resolveMediaUrl(u.profile_picture || u.avatar_url),
+            ...(collegeName
+              ? { college_name: collegeName, tenant_name: u.tenant_name?.trim() || collegeName }
+              : {}),
         }
         : {
             id: '',
@@ -106,18 +140,77 @@ export function formatPostFromApi(postData) {
     const commentsPreview = Array.isArray(postData.comments)
         ? postData.comments.map((x) => formatComment(x))
         : undefined;
-    return {
+    return enrichSelfAuthorInPost({
         ...postData,
         visibility: mapVisibilityFromApi(String(postData.visibility || 'public')),
         media_urls: normalizeMediaUrls(postData.media_urls),
         views_count: postData.views_count ?? 0,
         likes_count: postData.likes_count ?? 0,
         comments_count: postData.comments_count ?? 0,
+        reposts_count: postData.reposts_count ?? 0,
+        amplifies_count: postData.amplifies_count ?? postData.reposts_count ?? 0,
         is_liked: postData.is_liked ?? false,
+        is_reposted: postData.is_reposted ?? false,
+        is_amplified: postData.is_amplified ?? postData.is_reposted ?? false,
+        feed_type: postData.feed_type || 'post',
         is_bookmarked: postData.is_bookmarked ?? false,
         mentioned_users: postData.mentioned_users || [],
         user: formattedUser,
         ...(commentsPreview ? { comments: commentsPreview } : {}),
+    });
+}
+export function formatFeedItemFromApi(item) {
+    if (!item || typeof item !== 'object') return null;
+    if (item.feed_type === 'amplify') {
+        const amplifier = item.amplifier
+            ? {
+                ...item.amplifier,
+                name: item.amplifier.name || item.amplifier.full_name || 'User',
+                avatar_url: resolveMediaUrl(item.amplifier.avatar_url || item.amplifier.profile_picture),
+            }
+            : null;
+        const originalPost = formatPostFromApi(item.original_post);
+        if (!amplifier || !originalPost) return null;
+        return {
+            feed_type: 'amplify',
+            id: item.id || `amplify-${item.amplify_id}`,
+            amplify_id: item.amplify_id,
+            amplify_comment: item.amplify_comment || null,
+            amplified_at: item.amplified_at,
+            sort_at: item.sort_at || item.amplified_at,
+            amplifier,
+            original_post: originalPost,
+            original_post_id: item.original_post_id || originalPost.id,
+        };
+    }
+    return formatPostFromApi(item);
+}
+function formatEngagementUser(u) {
+    if (!u)
+        return null;
+    const avatar = resolveMediaUrl(u.profile_picture || u.avatar_url);
+    return {
+        id: u.id,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        full_name: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'User',
+        name: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'User',
+        avatar_url: avatar,
+        profile_picture: avatar,
+        user_type: u.user_type,
+        college_name: u.college_name,
+        academic_identity: u.academic_identity,
+        professional_identity: u.professional_identity,
+        company: u.company,
+        position: u.position,
+        degree: u.degree,
+        branch: u.branch,
+        department: u.department,
+        academic_year: u.academic_year,
+        graduation_batch: u.graduation_batch,
+        designation: u.designation,
+        is_following: Boolean(u.is_following),
+        reposted_at: u.reposted_at || null,
     };
 }
 class PostService {
@@ -134,6 +227,9 @@ class PostService {
         }
         if (data.code_language) {
             formData.append('code_language', data.code_language);
+        }
+        if (data.code_file_name) {
+            formData.append('code_file_name', data.code_file_name);
         }
         if (data.media) {
             data.media.forEach((file) => {
@@ -165,7 +261,7 @@ class PostService {
             data = response.data;
         }
         const rawPosts = data.posts || [];
-        const formattedPosts = rawPosts.map((post) => formatPostFromApi(post)).filter(Boolean);
+        const formattedPosts = rawPosts.map((post) => formatFeedItemFromApi(post)).filter(Boolean);
         const pg = data.pagination || {};
         return {
             posts: formattedPosts,
@@ -203,6 +299,9 @@ class PostService {
         if (data.code_language !== undefined) {
             formData.append('code_language', data.code_language);
         }
+        if (data.code_file_name !== undefined) {
+            formData.append('code_file_name', data.code_file_name);
+        }
         if (data.media && data.media.length > 0) {
             data.media.forEach((file) => {
                 formData.append('media', file);
@@ -232,6 +331,77 @@ class PostService {
             return response.data.data;
         }
         return response.data;
+    }
+    async getPostLikes(id, params = {}) {
+        const response = await api.get(`/posts/${id}/likes`, { params });
+        const payload = response.data.status && response.data.data ? response.data.data : response.data;
+        const rows = payload.users || [];
+        const pg = payload.pagination || {};
+        return {
+            users: rows.map((u) => formatEngagementUser(u)).filter(Boolean),
+            total: pg.total ?? 0,
+            page: pg.page ?? 1,
+            totalPages: pg.pages ?? 1,
+        };
+    }
+    async getPostReposts(id, params = {}) {
+        const response = await api.get(`/posts/${id}/reposts`, { params });
+        const payload = response.data.status && response.data.data ? response.data.data : response.data;
+        const rows = payload.users || [];
+        const pg = payload.pagination || {};
+        return {
+            users: rows.map((u) => formatEngagementUser(u)).filter(Boolean),
+            total: pg.total ?? 0,
+            page: pg.page ?? 1,
+            totalPages: pg.pages ?? 1,
+        };
+    }
+    async toggleRepost(id) {
+        const response = await api.post(`/posts/${id}/repost`);
+        if (response.data.status && response.data.data) {
+            return response.data.data;
+        }
+        return response.data;
+    }
+    async amplifyPost(id, { comment = null } = {}) {
+        try {
+            const response = await api.post(`/posts/${id}/repost`, {
+                comment,
+                amplify_comment: comment,
+            });
+            const data = response.data.status && response.data.data ? response.data.data : response.data;
+            if (response.data.status === false) {
+                const err = new Error(response.data.message || 'Could not amplify this post.');
+                err.response = { status: 409, data: response.data };
+                throw err;
+            }
+            return {
+                ...data,
+                is_reposted: Boolean(data.is_reposted ?? data.is_amplified),
+                is_amplified: Boolean(data.is_amplified ?? data.is_reposted),
+                amplifies_count: data.amplifies_count ?? data.reposts_count ?? 0,
+                reposts_count: data.reposts_count ?? data.amplifies_count ?? 0,
+            };
+        } catch (err) {
+            if (err?.response?.status === 409) {
+                const body = err.response.data || {};
+                const wrapped = new Error(body.message || 'You have already amplified this post.');
+                wrapped.response = err.response;
+                throw wrapped;
+            }
+            throw err;
+        }
+    }
+    async removeAmplify(id) {
+        const response = await api.post(`/posts/${id}/repost`, { remove: true });
+        const data = response.data.status && response.data.data ? response.data.data : response.data;
+        return {
+            ...data,
+            is_reposted: Boolean(data.is_reposted ?? data.is_amplified),
+            is_amplified: Boolean(data.is_amplified ?? data.is_reposted),
+            amplifies_count: data.amplifies_count ?? data.reposts_count ?? 0,
+            reposts_count: data.reposts_count ?? data.amplifies_count ?? 0,
+        };
     }
     async addComment(id, text, parentCommentId) {
         const payload = parentCommentId ? { text, parent_comment_id: parentCommentId } : { text };

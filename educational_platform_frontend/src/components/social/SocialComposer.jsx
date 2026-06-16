@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
@@ -21,7 +21,7 @@ import { useComposerDropdownAnchor } from '@/components/social/useComposerDropdo
  * @param {'all'|'teachers'} mentionMode - user search scope
  * @param {'boxed'|'inline'} variant - layout style
  */
-export default function SocialComposer({
+export default forwardRef(function SocialComposer({
   id = 'social-composer',
   placeholder = 'Write something… Use @ to mention people, # for topics',
   popularTags = [],
@@ -41,7 +41,7 @@ export default function SocialComposer({
   textareaClassName = '',
   onMentionedUsersChange,
   className = '',
-}) {
+}, ref) {
   const { user: currentUser } = useAuth();
   const textareaRef = useRef(null);
   const mirrorInnerRef = useRef(null);
@@ -345,6 +345,35 @@ export default function SocialComposer({
     }
   };
 
+  const insertAtCursor = useCallback(
+    (snippet) => {
+      const ta = textareaRef.current;
+      const start = ta?.selectionStart ?? text.length;
+      const end = ta?.selectionEnd ?? start;
+      const next = text.slice(0, start) + snippet + text.slice(end);
+      setText(next);
+      const pos = start + snippet.length;
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+        setCursor(pos);
+      });
+    },
+    [text, setText],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      submit: handleSubmit,
+      insertAtCursor,
+      focus: () => textareaRef.current?.focus(),
+    }),
+    [handleSubmit, insertAtCursor],
+  );
+
   const showMentionPanel = activeAutocomplete.kind === 'mention' && Boolean(mentionCtx);
   const showHashtagPanel = activeAutocomplete.kind === 'hashtag' && Boolean(hashtagCtx);
   const panelOpen = showMentionPanel || showHashtagPanel;
@@ -484,4 +513,4 @@ export default function SocialComposer({
       ) : null}
     </div>
   );
-}
+});

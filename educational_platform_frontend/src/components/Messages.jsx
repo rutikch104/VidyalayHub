@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from '@/components/ui/sonner';
+import { NOTIF_NAV_KEYS, consumeStringKey } from '@/lib/notificationNavigation';
 import {
   MessageCircle,
   Search,
@@ -17,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import messageService, { emitMessagesChanged } from '@/services/messageService';
 import connectionService from '@/services/connectionService';
 import UserAvatar from '@/components/ui/UserAvatar';
+import PlatformSelect from '@/components/ui/PlatformSelect';
 import ClickableUser from '@/components/ui/ClickableUser';
 import { useProfileNavigationOptional } from '@/contexts/ProfileNavigationContext';
 import { PRESENCE_STATUS } from '@/lib/presence';
@@ -165,6 +168,22 @@ export default function Messages() {
       }
     })();
   }, [user?.id]);
+
+  useEffect(() => {
+    const threadId = consumeStringKey(NOTIF_NAV_KEYS.THREAD_ID);
+    if (!threadId || threads.length === 0) return;
+    const match = threads.find((t) => String(t.id) === String(threadId));
+    if (match) setSelectedThread(match);
+    else {
+      void (async () => {
+        try {
+          await fetchThreads();
+        } catch {
+          toast.error('Content no longer available.');
+        }
+      })();
+    }
+  }, [threads, fetchThreads]);
 
   useEffect(() => {
     if (!selectedThread?.id) {
@@ -591,11 +610,12 @@ export default function Messages() {
                   Connection or user ID
                 </label>
                 {networkUsers.length > 0 ? (
-                  <select
+                  <PlatformSelect
                     id="user-select"
-                    className="mb-2 w-full rounded-lg border border-border p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mb-2 w-full"
                     value={selectedUserId}
                     onChange={(e) => setSelectedUserId(e.target.value)}
+                    placeholder="Select someone…"
                   >
                     <option value="">Select someone…</option>
                     {networkUsers.map((urow) => (
@@ -603,7 +623,7 @@ export default function Messages() {
                         {[urow.first_name, urow.last_name].filter(Boolean).join(' ') || urow.email || urow.id}
                       </option>
                     ))}
-                  </select>
+                  </PlatformSelect>
                 ) : null}
                 <input
                   type="text"

@@ -25,6 +25,32 @@ export function filterPostsForCollegeHome(posts, user) {
   }
 
   return posts.filter((post) => {
+    if (post.feed_type === 'amplify') {
+      const amplifierTid =
+        post.amplifier?.tenant_id != null && String(post.amplifier.tenant_id).trim() !== ''
+          ? String(post.amplifier.tenant_id).trim()
+          : '';
+      if (amplifierTid && amplifierTid !== tid) return false;
+      if (String(post.amplifier?.id) === String(user.id)) return true;
+
+      const original = post.original_post || {};
+      const vis = String(original.visibility || 'public').toLowerCase();
+      if (vis === 'private' || vis === 'private_only') return false;
+
+      const postTid =
+        original.tenant_id != null && String(original.tenant_id).trim() !== ''
+          ? String(original.tenant_id).trim()
+          : '';
+      const authorTid =
+        original.user?.tenant_id != null && String(original.user.tenant_id).trim() !== ''
+          ? String(original.user.tenant_id).trim()
+          : '';
+
+      if (postTid && postTid !== tid) return false;
+      if (authorTid && authorTid !== tid) return false;
+      return true;
+    }
+
     if (String(post.user_id) === String(user.id)) return true;
 
     const postTid =

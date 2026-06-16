@@ -44,9 +44,10 @@ test.describe('App smoke (mock API)', () => {
             });
         });
     }
-    test('sidebar Settings', async ({ page }) => {
+    test('header account menu Settings', async ({ page }) => {
         await page.goto('/');
-        await page.locator('aside').getByRole('button', { name: /^Settings$/ }).click();
+        await page.getByRole('button', { name: /Account menu/i }).click();
+        await page.getByRole('menuitem', { name: /^Settings$/ }).click();
         await expect(page.locator('main').getByRole('heading', { name: /^Settings$/ })).toBeVisible({
             timeout: 25000,
         });

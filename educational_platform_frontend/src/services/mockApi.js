@@ -706,7 +706,30 @@ function matchRoute(method, url, body = {}) {
                 { tag: 'React' },
             ],
         };
-    if (u.includes('/posts') && method === 'GET' && !u.includes('/comments'))
+    if (u.match(/\/posts\/[^/]+\/likes/) && method === 'GET')
+        return {
+            status: true,
+            data: {
+                users: [
+                    { id: '2', first_name: 'Priya', last_name: 'Deshmukh', full_name: 'Priya Deshmukh', profile_picture: AVATAR3, user_type: 'student', academic_identity: 'B.Tech • Computer Engineering • TY', is_following: false },
+                    { id: '3', first_name: 'Amit', last_name: 'Patel', full_name: 'Amit Patel', profile_picture: AVATAR2, user_type: 'student', academic_identity: 'B.Tech • IT • Final Year', is_following: true },
+                ],
+                pagination: { total: 2, page: 1, pages: 1, limit: 20 },
+            },
+        };
+    if (u.match(/\/posts\/[^/]+\/reposts/) && method === 'GET')
+        return {
+            status: true,
+            data: {
+                users: [
+                    { id: '4', first_name: 'Sneha', last_name: 'Joshi', full_name: 'Sneha Joshi', profile_picture: AVATAR4, user_type: 'student', academic_identity: 'B.Tech • CSE • SY', reposted_at: now, is_following: false },
+                ],
+                pagination: { total: 1, page: 1, pages: 1, limit: 20 },
+            },
+        };
+    if (u.match(/\/posts\/[^/]+\/repost/) && method === 'POST')
+        return { status: true, data: { is_reposted: true, reposts_count: 3 } };
+    if (u.includes('/posts') && method === 'GET' && !u.includes('/comments') && !u.match(/\/posts\/[^/]+\/(likes|reposts)$/))
         return { status: true, data: { posts: mockPosts, pagination: { total: mockPosts.length, page: 1, pages: 1 } } };
     if (u.match(/\/posts\/[^/]+\/comments/) && method === 'GET')
         return { status: true, data: { comments: mockComments, pagination: { total: 3, page: 1, pages: 1 } } };

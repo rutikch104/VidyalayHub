@@ -55,6 +55,10 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             // For code snippets, specify the programming language
         },
+        code_file_name: {
+            type: DataTypes.STRING(120),
+            allowNull: true,
+        },
         visibility: {
             type: DataTypes.ENUM('public', 'college', 'private'),
             allowNull: false,
@@ -75,6 +79,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 0,
         },
+        reposts_count: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
         created_at: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,
@@ -91,6 +100,7 @@ module.exports = (sequelize, DataTypes) => {
         // Post.belongsTo(models.Course, { foreignKey: 'course_id', as: 'course' }); // 🔵 Uncomment this if Course model is ready
         Post.hasMany(models.Comment, { foreignKey: 'post_id', as: 'comments' });    // ✅ Post has many Comments
         Post.hasMany(models.Like, { foreignKey: 'post_id', as: 'likes' });          // ✅ Post has many Likes
+        Post.hasMany(models.PostRepost, { foreignKey: 'post_id', as: 'reposts' });
         Post.hasMany(models.PostMention, { foreignKey: 'post_id', as: 'mentions' });
     };
 

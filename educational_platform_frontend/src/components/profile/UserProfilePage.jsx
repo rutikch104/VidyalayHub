@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import userService from '@/services/userService';
 import connectionService from '@/services/connectionService';
-import { formatPostFromApi } from '@/services/postService';
+import { formatFeedItemFromApi } from '@/services/postService';
 import VidhyalayHubProfileLayout from '@/components/profile/eduConnect/VidhyalayHubProfileLayout';
 import { mapPublicProfileToLayout } from '@/lib/mapPublicProfileToLayout';
 import ProfileSkeleton from '@/components/profile/premium/ProfileSkeleton';
@@ -60,7 +60,7 @@ export default function UserProfilePage({ userId, onBack, onNavigate }) {
     try {
       const response = await userService.getUserPosts(userId, { page: 1, limit: 30 });
       const raw = response.posts || [];
-      setUserPosts(raw.map(formatPostFromApi).filter(Boolean));
+      setUserPosts(raw.map(formatFeedItemFromApi).filter(Boolean));
     } catch {
       setUserPosts([]);
     } finally {

@@ -5,10 +5,11 @@ import { TenantProvider } from '@/contexts/TenantContext';
 import { ProfileNavigationProvider } from '@/contexts/ProfileNavigationContext';
 import Header         from '@/components/Header';
 import LeftSidebar    from '@/components/LeftSidebar';
-import RightSidebar   from '@/components/RightSidebar';
+import HomeSidebarRail from '@/components/home/HomeSidebarRail';
 import FeedTabs       from '@/components/FeedTabs';
 import CreatePost     from '@/components/CreatePost';
 import PostCard       from '@/components/PostCard';
+import FeedPostCard   from '@/components/posts/FeedPostCard';
 import FeedSkeleton   from '@/components/FeedSkeleton';
 import Profile        from '@/components/Profile';
 import ProfileActivity from '@/components/ProfileActivity';
@@ -51,13 +52,20 @@ function LazyPage({ children }) {
 }
 import Login          from '@/components/Login';
 import Register       from '@/components/Register';
+import RegistrationStatusPage from '@/components/registration/RegistrationStatusPage';
 import CollegeRegister from '@/components/CollegeRegister';
 import SuperAdminLogin from '@/components/SuperAdminLogin';
 import postService         from '@/services/postService';
 import notificationService from '@/services/notificationService';
 import messageService      from '@/services/messageService';
+import { NOTIF_NAV_KEYS, peekStringKey } from '@/lib/notificationNavigation';
+import { toast } from '@/components/ui/sonner';
 import { Sparkles } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import ProfileOnboardingWizard from '@/components/onboarding/ProfileOnboardingWizard';
+import userService from '@/services/userService';
+import { setSelfProfileCache } from '@/lib/selfIdentityCache';
+import { shouldShowOnboarding } from '@/lib/onboardingUtils';
 
 /* ─── Main app content ──────────────────────────────────────────── */
 function AppContent() {
@@ -70,8 +78,27 @@ function AppContent() {
   const [messagesBadge,     setMessagesBadge]     = useState(0);
   const [notificationsBadge,setNotificationsBadge]= useState(0);
   const [interviewSessionId, setInterviewSessionId] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!user || user.user_type === 'staff') {
+      setShowOnboarding(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await userService.getCurrentUserProfile();
+        setSelfProfileCache(profile);
+        if (!cancelled) setShowOnboarding(shouldShowOnboarding(profile, user));
+      } catch {
+        if (!cancelled) setShowOnboarding(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.user_type]);
 
   useEffect(() => {
     if (!user) return;
@@ -128,10 +155,38 @@ function AppContent() {
   }, [user, currentPage, fetchPosts]);
 
   useEffect(() => {
+    if (currentPage !== 'home' || !user) return;
+    const postId = peekStringKey(NOTIF_NAV_KEYS.POST_ID) || peekStringKey('scroll_to_post_id');
+    if (!postId) return;
+    if (posts.some((p) => String(p.id) === String(postId) || String(p.original_post_id) === String(postId))) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const post = await postService.getPost(postId);
+        if (cancelled) return;
+        setPosts((prev) => {
+          if (prev.some((p) => String(p.id) === String(postId))) return prev;
+          return [post, ...prev];
+        });
+      } catch {
+        if (!cancelled) {
+          sessionStorage.removeItem(NOTIF_NAV_KEYS.POST_ID);
+          sessionStorage.removeItem('scroll_to_post_id');
+          sessionStorage.removeItem(NOTIF_NAV_KEYS.OPEN_COMMENTS);
+          sessionStorage.removeItem(NOTIF_NAV_KEYS.COMMENT_ID);
+          toast.error('Content no longer available.');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentPage, user, posts]);
+
+  useEffect(() => {
     if (currentPage !== 'home' || posts.length === 0) return;
-    const pid = sessionStorage.getItem('scroll_to_post_id');
+    const pid = sessionStorage.getItem('scroll_to_post_id') || sessionStorage.getItem(NOTIF_NAV_KEYS.POST_ID);
     if (!pid) return;
-    sessionStorage.removeItem('scroll_to_post_id');
+    if (!posts.some((p) => String(p.id) === String(pid) || String(p.original_post_id) === String(pid))) return;
     const t = window.setTimeout(() => {
       document.getElementById(`post-${pid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 120);
@@ -142,7 +197,44 @@ function AppContent() {
     const scoped = filterPostsForCollegeHome([newPost], user);
     if (scoped.length) setPosts((prev) => [newPost, ...prev]);
   };
-  const handlePostDeleted = (postId)  => setPosts((prev) => prev.filter((p) => p.id !== postId));
+  const handlePostDeleted = (postId)  => setPosts((prev) => prev.filter((p) => p.id !== postId && p.original_post_id !== postId));
+  const handleAmplifyRemoved = (amplifyItem, res) => {
+    setPosts((prev) => prev.filter((p) => p.id !== amplifyItem.id));
+    if (res && !res.is_amplified && !res.is_reposted && amplifyItem?.original_post_id) {
+      setPosts((prev) =>
+        prev.map((p) =>
+          String(p.id) === String(amplifyItem.original_post_id)
+            ? {
+                ...p,
+                is_amplified: false,
+                is_reposted: false,
+                reposts_count: res.reposts_count ?? res.amplifies_count ?? p.reposts_count,
+                amplifies_count: res.amplifies_count ?? res.reposts_count ?? p.amplifies_count,
+              }
+            : p,
+        ),
+      );
+    }
+  };
+
+  const handleAmplifyStateChange = (postId, res) => {
+    if (res?.is_amplified || res?.is_reposted) return;
+    setPosts((prev) =>
+      prev
+        .filter((p) => !(p.feed_type === 'amplify' && String(p.original_post_id) === String(postId)))
+        .map((p) =>
+          String(p.id) === String(postId)
+            ? {
+                ...p,
+                is_amplified: false,
+                is_reposted: false,
+                reposts_count: res.reposts_count ?? res.amplifies_count ?? p.reposts_count,
+                amplifies_count: res.amplifies_count ?? res.reposts_count ?? p.amplifies_count,
+              }
+            : p,
+        ),
+    );
+  };
   const handlePostEdited  = (updated) => setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p));
 
   const canSeeSuperAdmin = user ? canSeeSuperAdminNav(user) : false;
@@ -177,6 +269,8 @@ function AppContent() {
       <div className="min-h-screen app-body-surface">
         {path === '/register' ? (
           <Register />
+        ) : path === '/registration-status' ? (
+          <RegistrationStatusPage />
         ) : path === '/register-college' ? (
           <CollegeRegister />
         ) : path === '/super-admin-login' ? (
@@ -210,10 +304,6 @@ function AppContent() {
     </div>
   );
 
-  const withSuperAdminLayout = (content) => (
-    <main className="min-h-[calc(100vh-4rem)] w-full">{content}</main>
-  );
-
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'library':       return withMainLayout('library',       <LazyPage><LibraryCenter /></LazyPage>);
@@ -245,7 +335,7 @@ function AppContent() {
           </LazyPage>,
         );
       case 'ai-english':    return withMainLayout('ai-english',    <LazyPage><AIEnglish /></LazyPage>);
-      case 'notifications': return withMainLayout('notifications', <LazyPage><Notifications /></LazyPage>);
+      case 'notifications': return withMainLayout('notifications', <LazyPage><Notifications onNavigate={setCurrentPage} /></LazyPage>);
       case 'messages':      return withMainLayout('messages',      <LazyPage><Messages /></LazyPage>);
       case 'communities':   return withMainLayout('communities',   <LazyPage><Communities /></LazyPage>);
       case 'bookmarks':     return withMainLayout('bookmarks',     <LazyPage><Bookmarks /></LazyPage>);
@@ -280,7 +370,7 @@ function AppContent() {
         );
       case 'super-admin':
         return canSeeSuperAdmin
-          ? withSuperAdminLayout(<LazyPage><SuperAdminDashboard /></LazyPage>)
+          ? withMainLayout('super-admin', <LazyPage><SuperAdminDashboard /></LazyPage>)
           : withMainLayout(
               'home',
               <PortalAccessDenied
@@ -304,44 +394,48 @@ function AppContent() {
               canSeeAdmin={canSeeAdmin}
               {...sidebarCounts}
             />
-            <main className="main-canvas">
-              <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-3 py-5 sm:px-5 xl:flex-row xl:gap-8 xl:px-8 xl:py-7">
-                <div className="min-w-0 flex-1 space-y-5">
-                  <FeedTabs activeTab={activeFeedTab} onTabChange={setActiveFeedTab} />
-                  <CreatePost onPostCreated={handlePostCreated} />
+            <main className="main-canvas home-layout">
+              <div className="home-layout__container">
+                <div className="home-layout__grid">
+                  <section className="home-layout__feed" aria-label="Feed">
+                    <div className="home-layout__feed-nav">
+                      <FeedTabs activeTab={activeFeedTab} onTabChange={setActiveFeedTab} />
+                    </div>
+                    <div className="home-layout__feed-stream">
+                      <CreatePost onPostCreated={handlePostCreated} />
 
-                  {error && <div className="app-alert-error rounded-xl">{error}</div>}
+                      {error && <div className="app-alert-error rounded-xl">{error}</div>}
 
-                  {loading ? (
-                    <FeedSkeleton />
-                  ) : (
-                    <div className="platform-stagger space-y-4">
-                      {posts.length === 0 ? (
-                        <EmptyState
-                          icon={Sparkles}
-                          title="No posts yet"
-                          description="Start a conversation above — share something with your campus!"
-                        />
+                      {loading ? (
+                        <FeedSkeleton />
                       ) : (
-                        posts.map((post) => (
-                          <PostCard
-                            key={post.id}
-                            post={post}
-                            onPostDeleted={handlePostDeleted}
-                            onPostEdited={handlePostEdited}
-                            onNavigate={setCurrentPage}
-                          />
-                        ))
+                        <div className="platform-stagger space-y-4">
+                          {posts.length === 0 ? (
+                            <EmptyState
+                              icon={Sparkles}
+                              title="No posts yet"
+                              description="Start a conversation above — share something with your campus!"
+                            />
+                          ) : (
+                            posts.map((post) => (
+                              <FeedPostCard
+                                key={post.id}
+                                item={post}
+                                onPostDeleted={handlePostDeleted}
+                                onPostEdited={handlePostEdited}
+                                onNavigate={setCurrentPage}
+                                onAmplifyRemoved={handleAmplifyRemoved}
+                                onAmplifyStateChange={handleAmplifyStateChange}
+                              />
+                            ))
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </section>
 
-                <aside className="hidden w-full shrink-0 xl:block xl:w-72 xl:pt-0.5">
-                  <div className="sticky top-[4.25rem] space-y-5">
-                    <RightSidebar onNavigate={setCurrentPage} />
-                  </div>
-                </aside>
+                  <HomeSidebarRail onNavigate={setCurrentPage} />
+                </div>
               </div>
             </main>
           </div>
@@ -359,6 +453,13 @@ function AppContent() {
           isMobileMenuOpen={mobileMenuOpen}
         />
         {renderCurrentPage()}
+        {showOnboarding ? (
+          <ProfileOnboardingWizard
+            user={user}
+            onComplete={() => setShowOnboarding(false)}
+            onDismiss={() => setShowOnboarding(false)}
+          />
+        ) : null}
       </div>
     </ProfileNavigationProvider>
   );

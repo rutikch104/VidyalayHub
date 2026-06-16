@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import userService from '@/services/userService';
 import { resolveMediaUrl, formatPostFromApi } from '@/services/postService';
 import VidhyalayHubProfileLayout from '@/components/profile/eduConnect/VidhyalayHubProfileLayout';
+import { mapPublicProfileToLayout } from '@/lib/mapPublicProfileToLayout';
 import ProfileSectionEditModals from '@/components/profile/ProfileSectionEditModals';
 import { profileDesign } from '@/components/profile/profileStyles';
 import ProfileSkeleton from '@/components/profile/premium/ProfileSkeleton';
@@ -97,57 +98,14 @@ export default function Profile({ onNavigate }) {
       if (!response || response.id == null || response.id === '') {
         throw new Error('Invalid profile response');
       }
-      const avatarSrc = resolveMediaUrl(response.avatar_url || '') || response.avatar_url || DEFAULT_AVATAR;
-      const coverRaw = response.cover_image_url;
-      const coverSrc = coverRaw ? resolveMediaUrl(coverRaw) || coverRaw : '';
-      const ut = response.user_type || 'student';
-      const bioRaw = response.bio;
-      const bioText =
-        typeof bioRaw === 'string'
-          ? bioRaw.trim()
-          : bioRaw != null && bioRaw !== ''
-            ? String(bioRaw).trim()
-            : '';
-      const achievementsRaw = response.achievements;
-      const achievementsList = Array.isArray(achievementsRaw)
-        ? achievementsRaw
-        : typeof achievementsRaw === 'string'
-          ? (() => {
-              try {
-                const p = JSON.parse(achievementsRaw);
-                return Array.isArray(p) ? p : [];
-              } catch {
-                return [];
-              }
-            })()
-          : [];
-      const experienceList = Array.isArray(response.experience_list) ? response.experience_list : [];
-      const educationList = Array.isArray(response.education_list) ? response.education_list : [];
-      const skillsDetailed = Array.isArray(response.skills_detailed) ? response.skills_detailed : [];
-      const teachingInfo = response.teaching_info && typeof response.teaching_info === 'object'
-        ? response.teaching_info
-        : { subjects: [], experience_years: null, notes: '' };
-
+      const mapped = mapPublicProfileToLayout(response);
+      if (!mapped) {
+        throw new Error('Invalid profile response');
+      }
       const profile = {
-        id: response.id,
-        first_name: response.first_name || '',
-        last_name: response.last_name || '',
-        name: response.name || 'User',
-        title:
-          response.title ||
-          (ut === 'student' ? 'Student' : ut === 'teacher' ? 'Teacher' : ut === 'alumni' ? 'Alumni' : 'User'),
-        userType: ut === 'teacher' || ut === 'alumni' ? ut : 'student',
-        phone: response.phone || response.phone_number || '',
-        email: response.email || user?.email || '',
-        show_email: !!response.show_email,
-        show_phone: !!response.show_phone,
-        avatar: avatarSrc,
-        coverImage: coverSrc,
-        location: response.location || '',
-        headline: response.headline || '',
-        bio: bioText,
-        teachingInfo,
-        joinedAt: response.created_at || response.createdAt || user?.created_at || null,
+        ...mapped,
+        email: mapped.email || user?.email || '',
+        joinedAt: mapped.joinedAt || response.createdAt || user?.created_at || null,
         stats: {
           posts: response.posts_count || 0,
           followers: response.followers_count || 0,
@@ -155,37 +113,6 @@ export default function Profile({ onNavigate }) {
           connections: response.connections_count || 0,
           likes: response.likes_count || 0,
         },
-        socialLinks: {
-          linkedin: response.linkedin_url || undefined,
-          twitter: response.twitter_url || undefined,
-          github: response.github_url || undefined,
-          website: response.website_url || undefined,
-        },
-        academicInfo: {
-          enrollmentYear: response.enrollment_year,
-          currentSemester: response.current_semester,
-          gpa: response.gpa,
-          course: response.course || undefined,
-          department: response.department || undefined,
-          university: response.university || undefined,
-          graduationYear: response.graduation_year,
-        },
-        professionalInfo: {
-          company: response.company || undefined,
-          position: response.position || undefined,
-          experience: response.experience || undefined,
-          experienceList,
-          skills: response.skills || [],
-          skillsDetailed,
-          certifications: response.certifications || [],
-        },
-        educationList,
-        achievements: achievementsList,
-        clubs: response.clubs || [],
-        events: response.events || [],
-        projects: response.projects || [],
-        isOnline: true,
-        isPro: response.is_premium || false,
         profileCompletion: response.profile_completion ?? 0,
       };
       setProfileData(profile);

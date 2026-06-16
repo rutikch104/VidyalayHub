@@ -9,8 +9,26 @@
 @import './styles/profile-page.css';
 @import './styles/profile-premium.css';
 @import './styles/home-profile-card.css';
+@import './styles/upcoming-events-widget.css';
+@import './styles/notice-board-widget.css';
+@import './styles/trending-widget.css';
+@import './styles/profile-onboarding.css';
+@import './styles/home-layout.css';
+@import './styles/post-composer.css';
+@import './styles/post-feed-card.css';
+@import './styles/post-engagement.css';
+@import './styles/post-amplify.css';
+@import './styles/network-premium.css';
+@import './styles/confirm-action-dialog.css';
+@import './styles/dropdown-premium.css';
+@import './styles/library-resource-card.css';
+@import './styles/jobs-card-premium.css';
+@import './styles/community-card-premium.css';
+@import './styles/code-snippet.css';
 @import './styles/platform-premium.css';
 @import './styles/super-admin-premium.css';
+@import './styles/registration-premium.css';
+@import './styles/academic-identity.css';
 
 @tailwind base;
 @tailwind components;
@@ -35,7 +53,7 @@ html {
 }
 
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
@@ -519,7 +537,9 @@ body {
       radial-gradient(ellipse 65% 50% at 100% 0%, hsl(var(--accent) / 0.1), transparent 52%);
   }
   .main-canvas {
-    @apply min-w-0 flex-1 overflow-x-hidden;
+    @apply min-w-0 flex-1;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 }
 
@@ -630,7 +650,7 @@ body {
     @apply flex min-h-screen;
   }
   .auth-panel-brand {
-    @apply hidden lg:flex lg:w-[46%] xl:w-[44%] flex-col justify-between p-10 text-white;
+    @apply hidden lg:flex lg:w-[38%] xl:w-[36%] flex-col justify-between p-10 text-white;
     background-image: var(--gradient-primary);
     position: relative;
     overflow: hidden;
@@ -646,7 +666,38 @@ body {
   }
   .auth-panel-brand > * { position: relative; z-index: 1; }
   .auth-panel-form {
-    @apply flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10 bg-background;
+    @apply flex flex-1 flex-col items-center justify-center px-6 py-10 sm:px-10 lg:px-12 xl:px-16 bg-background;
+    overflow-y: auto;
+  }
+
+  .auth-panel-form__login {
+    width: 100%;
+    max-width: 28rem;
+    margin-inline: auto;
+  }
+
+  .auth-panel-form__inner {
+    width: 100%;
+    max-width: 52rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 1024px) {
+    .auth-panel-form__inner {
+      max-width: 56rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .auth-panel-form__inner {
+      max-width: 64rem;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .auth-panel-form__inner {
+      max-width: 72rem;
+    }
   }
 
   /* ── Post action button ────────────── */

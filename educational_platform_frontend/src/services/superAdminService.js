@@ -57,18 +57,61 @@ class SuperAdminService {
             throw new Error('College not found');
         return response.data.data;
     }
-    async createCollege(data) {
-        const response = await api.post('/super-admin/colleges', data);
+    /**
+     * Create a college. Pass `logoFile` (File/Blob) to upload the logo as part
+     * of the same multipart request; omit it for a plain JSON create.
+     */
+    async createCollege(data, logoFile) {
+        let response;
+        if (logoFile) {
+            const fd = new FormData();
+            Object.entries(data || {}).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) fd.append(k, String(v));
+            });
+            fd.append('logo', logoFile);
+            response = await api.post('/super-admin/colleges', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        } else {
+            response = await api.post('/super-admin/colleges', data);
+        }
         assertOk(response.data);
         if (!response.data.data)
             throw new Error('Invalid response');
         return response.data.data;
     }
-    async updateCollege(collegeId, data) {
-        const response = await api.put(`/super-admin/colleges/${collegeId}`, data);
+    async updateCollege(collegeId, data, logoFile) {
+        let response;
+        if (logoFile) {
+            const fd = new FormData();
+            Object.entries(data || {}).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) fd.append(k, String(v));
+            });
+            fd.append('logo', logoFile);
+            response = await api.put(`/super-admin/colleges/${collegeId}`, fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        } else {
+            response = await api.put(`/super-admin/colleges/${collegeId}`, data);
+        }
         assertOk(response.data);
         if (!response.data.data)
             throw new Error('Invalid response');
+        return response.data.data;
+    }
+    async uploadCollegeLogo(collegeId, file) {
+        const fd = new FormData();
+        fd.append('logo', file);
+        const response = await api.post(`/super-admin/colleges/${collegeId}/logo`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        assertOk(response.data);
+        if (!response.data.data) throw new Error('Invalid response');
+        return response.data.data;
+    }
+    async removeCollegeLogo(collegeId) {
+        const response = await api.delete(`/super-admin/colleges/${collegeId}/logo`);
+        assertOk(response.data);
         return response.data.data;
     }
     async deleteCollege(collegeId) {

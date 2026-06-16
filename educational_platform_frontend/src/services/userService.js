@@ -1,6 +1,7 @@
 // @ts-nocheck
 import api from './api';
 import { resolveMediaUrl } from './postService';
+import { setSelfProfileCache } from '@/lib/selfIdentityCache';
 
 /** Resolve relative /media and /uploads paths to full API URLs for profile images */
 export function normalizeProfileMedia(data) {
@@ -40,7 +41,9 @@ const userService = {
         if (!data || data.id == null || data.id === '') {
             throw new Error('Invalid profile response');
         }
-        return normalizeProfileMedia(data);
+        const normalized = normalizeProfileMedia(data);
+        setSelfProfileCache(normalized);
+        return normalized;
     },
     /** Home right sidebar: posts, connections, likes, location */
     getMeSidebarSummary: async () => {
@@ -48,7 +51,7 @@ const userService = {
         const body = response.data;
         if (body?.status && body.data)
             return body.data;
-        return { posts_count: 0, connections_count: 0, likes_received: 0, location: null, cover_image_url: null };
+        return { posts_count: 0, connections_count: 0, likes_received: 0, location: null };
     },
     getPublicProfile: async (userId) => {
         const response = await api.get(`/users/${userId}/public-profile`);
@@ -127,6 +130,17 @@ const userService = {
             return body.data;
         }
         throw new Error('Invalid profile update response');
+    },
+    updateOnboardingProfile: async (payload) => {
+        const response = await api.put('/users/profile/onboarding', payload);
+        const body = response.data;
+        if (body?.status === false) {
+            throw new Error(body.message || 'Failed to update profile');
+        }
+        if (body?.status && body.data) {
+            return normalizeProfileMedia(body.data);
+        }
+        throw new Error('Invalid onboarding update response');
     },
     updateProfileAbout: async (payload) => {
         const response = await api.put('/users/profile/about', payload);
@@ -405,15 +419,10 @@ const userService = {
             ? response.data.data
             : response.data;
         const posts = Array.isArray(data?.posts) ? data.posts : [];
-        const pid = String(userId);
-        const filtered = posts.filter((p) => {
-            const authorId = p?.user?.id ?? p?.user_id;
-            return authorId != null && String(authorId) === pid;
-        });
         return {
-            posts: filtered,
+            posts,
             pagination: data?.pagination || {
-                total: filtered.length,
+                total: posts.length,
                 page: 1,
                 pages: 1,
             },

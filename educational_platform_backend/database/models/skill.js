@@ -39,6 +39,7 @@ module.exports = (sequelize, DataTypes) => {
 
   Skill.associate = (models) => {
     Skill.hasMany(models.UserSkill, { foreignKey: 'skill_id', as: 'userSkills' });
+    Skill.hasMany(models.JobSkill, { foreignKey: 'skill_id', as: 'jobSkills' });
   };
 
   return Skill;

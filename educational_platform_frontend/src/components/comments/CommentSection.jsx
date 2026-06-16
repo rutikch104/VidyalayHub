@@ -64,6 +64,7 @@ export default function CommentSection({
   postOwnerId,
   commentsCount = 0,
   onCommentsCountChange,
+  focusCommentId = null,
 }) {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
@@ -113,6 +114,18 @@ export default function CommentSection({
     void loadComments({ page: 1, sort });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
+
+  useEffect(() => {
+    if (!focusCommentId || loading) return undefined;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`comment-${focusCommentId}`);
+      if (!el) return;
+      el.classList.add('comment-item--notif-target');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => el.classList.remove('comment-item--notif-target'), 3200);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [focusCommentId, loading, comments]);
 
   const handleSortChange = (nextSort) => {
     setSort(nextSort);
@@ -192,78 +205,69 @@ export default function CommentSection({
 
   return (
     <section className="comment-section" aria-label="Comments">
-      <div className="comment-section-header">
-        <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground sm:text-base">
-          <MessageCircle className="h-4 w-4 text-primary" />
-          {COPY.comments.title}
-          {commentsCount > 0 && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-              {commentsCount}
-            </span>
-          )}
-        </h4>
-        <PlatformTabs
-          tabs={SORT_OPTIONS.map((opt) => ({ key: opt.id, label: opt.label }))}
-          activeKey={sort}
-          onChange={handleSortChange}
-          ariaLabel="Sort comments"
-          size="compact"
+      <div className="comment-section-card">
+        <div className="comment-section-header">
+          <h4 className="comment-section-title">
+            <MessageCircle className="comment-section-title__icon" aria-hidden strokeWidth={2.25} />
+            {COPY.comments.title}
+            {commentsCount > 0 ? (
+              <span className="comment-section-count">{commentsCount}</span>
+            ) : null}
+          </h4>
+          <PlatformTabs
+            className="comment-sort-tabs"
+            tabs={SORT_OPTIONS.map((opt) => ({ key: opt.id, label: opt.label }))}
+            activeKey={sort}
+            onChange={handleSortChange}
+            ariaLabel="Sort comments"
+            size="compact"
+          />
+        </div>
+
+        <CommentComposer
+          value={mainText}
+          onChange={setMainText}
+          onSubmit={handleMainSubmit}
+          submitting={submitting}
         />
+
+        {error ? <div className="comment-error">{error}</div> : null}
+
+        {loading ? (
+          <CommentSkeleton rows={3} />
+        ) : comments.length > 0 ? (
+          <>
+            <div className="comment-thread">
+              {comments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  postId={postId}
+                  postOwnerId={postOwnerId}
+                  currentUserId={user?.id}
+                  onReply={handleReply}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onLike={handleLike}
+                  likingId={likingId}
+                  deletingId={deletingId}
+                  savingId={savingId}
+                />
+              ))}
+            </div>
+            {page < totalPages && (
+              <button
+                type="button"
+                className="comment-load-more"
+                disabled={loadingMore}
+                onClick={() => loadComments({ page: page + 1, append: true })}
+              >
+                {loadingMore ? 'Loading…' : COPY.comments.loadMore}
+              </button>
+            )}
+          </>
+        ) : null}
       </div>
-
-      <CommentComposer
-        value={mainText}
-        onChange={setMainText}
-        onSubmit={handleMainSubmit}
-        submitting={submitting}
-      />
-
-      {error && (
-        <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive sm:text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <CommentSkeleton rows={3} />
-      ) : comments.length === 0 ? (
-        <div className="comment-empty">
-          <MessageCircle className="mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm font-semibold text-foreground sm:text-base">{COPY.comments.emptyTitle}</p>
-          <p className="mt-1 max-w-xs text-sm text-muted-foreground">{COPY.comments.emptyBody}</p>
-        </div>
-      ) : (
-        <>
-          <div className="comment-thread">
-            {comments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                postId={postId}
-                postOwnerId={postOwnerId}
-                currentUserId={user?.id}
-                onReply={handleReply}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onLike={handleLike}
-                likingId={likingId}
-                deletingId={deletingId}
-                savingId={savingId}
-              />
-            ))}
-          </div>
-          {page < totalPages && (
-            <button
-              type="button"
-              className="comment-load-more"
-              disabled={loadingMore}
-              onClick={() => loadComments({ page: page + 1, append: true })}
-            >
-              {loadingMore ? 'Loading…' : COPY.comments.loadMore}
-            </button>
-          )}
-        </>
-      )}
     </section>
   );
 }

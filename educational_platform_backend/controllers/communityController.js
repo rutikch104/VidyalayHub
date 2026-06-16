@@ -6,10 +6,12 @@ const { tenantIdForCreate } = require('../utils/tenantHelpers');
 const { processUploadedFiles, publicUrlFromMulterFile } = require('../services/mediaUploadService');
 const { sanitizeCommentText } = require('../utils/commentText');
 const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
+const { loadAcademicIdentityForUsers } = require('../utils/academicIdentity');
+const { loadTenantNameMap } = require('../utils/networkHelpers');
 
 const pg = (v, d = 1) => parseInt(String(v), 10) || d;
 
-const USER_ATTRS = ['id', 'first_name', 'last_name', 'email', 'profile_picture'];
+const USER_ATTRS = ['id', 'first_name', 'last_name', 'email', 'profile_picture', 'user_type', 'tenant_id'];
 
 function rawProfilePicture(userLike) {
   if (!userLike) return '';
@@ -103,10 +105,31 @@ function formatCommunityPostWithAvatarMap(post, avatarMap, likedByMe = false, bo
   };
 }
 
+async function enrichCommunityPostsFromRows(rows, formattedPosts) {
+  if (!Array.isArray(formattedPosts) || !formattedPosts.length) return formattedPosts;
+  const authors = rows
+    .map((p) => {
+      const plain = p.toJSON ? p.toJSON() : p;
+      return plain.author || plain.user || null;
+    })
+    .filter(Boolean);
+  const [identityMap, tenantMap] = await Promise.all([
+    loadAcademicIdentityForUsers(authors),
+    loadTenantNameMap(authors.map((a) => a.tenant_id)),
+  ]);
+  return formattedPosts.map((post, index) => {
+    const plain = rows[index]?.toJSON ? rows[index].toJSON() : rows[index];
+    const author = plain?.author || plain?.user;
+    return applyIdentityToFormattedUser({ ...post }, author, identityMap, tenantMap);
+  });
+}
+
 async function formatSingleCommunityPost(post, likedByMe = false, bookmarkedByMe = false) {
   const p = post.toJSON ? post.toJSON() : post;
   const avatarMap = await loadAvatarMapForUserIds([p.user_id]);
-  return formatCommunityPostWithAvatarMap(post, avatarMap, likedByMe, bookmarkedByMe);
+  const formatted = formatCommunityPostWithAvatarMap(post, avatarMap, likedByMe, bookmarkedByMe);
+  const [enriched] = await enrichCommunityPostsFromRows([post], [formatted]);
+  return enriched;
 }
 
 async function bookmarkedCommunityPostIds(userId, postIds) {
@@ -185,6 +208,7 @@ function formatCommunityComment(row) {
     created_at: c.created_at,
     updated_at: c.updated_at,
     user_name: userDisplayName(author),
+    user_type: author.user_type || null,
     user_avatar: avatar,
     avatar_url: avatar,
   };
@@ -194,6 +218,40 @@ function userDisplayName(u) {
   if (!u) return 'Member';
   const p = u.toJSON ? u.toJSON() : u;
   return [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || p.email || 'Member';
+}
+
+function applyIdentityToFormattedUser(target, author, identityMap, tenantMap) {
+  if (!target || !author?.id) return target;
+  const identity = identityMap.get(String(author.id));
+  if (identity?.academic_identity) {
+    target.academic_identity = identity.academic_identity;
+    target.user_type = author.user_type || target.user_type || null;
+  }
+  if (identity?.professional_identity) {
+    target.professional_identity = identity.professional_identity;
+  }
+  if (identity?.company) target.company = identity.company;
+  if (identity?.position) target.position = identity.position;
+  const tid = author.tenant_id ? String(author.tenant_id) : null;
+  if (tid && tenantMap?.has(tid)) {
+    target.college_name = tenantMap.get(tid).name;
+  }
+  return target;
+}
+
+async function enrichFormattedCommunityUsers(items, authorKey = 'author') {
+  if (!Array.isArray(items) || !items.length) return items;
+  const authors = items
+    .map((item) => item?.[authorKey] || item?.user || null)
+    .filter(Boolean);
+  const [identityMap, tenantMap] = await Promise.all([
+    loadAcademicIdentityForUsers(authors),
+    loadTenantNameMap(authors.map((a) => a.tenant_id)),
+  ]);
+  return items.map((item) => {
+    const author = item?.[authorKey] || item?.user;
+    return applyIdentityToFormattedUser({ ...item }, author, identityMap, tenantMap);
+  });
 }
 
 function formatCommunity(community, extras = {}) {
@@ -253,6 +311,7 @@ function formatCommunityPost(post, likedByMe = false, bookmarkedByMe = false) {
     community_id: p.community_id,
     user_id: p.user_id,
     user_name: userDisplayName(author),
+    user_type: author.user_type || null,
     user_avatar: avatar,
     avatar_url: avatar,
     title: p.title || '',
@@ -510,9 +569,10 @@ exports.getMyCommunitiesFeed = async (req, res) => {
         bookmarkedSet.has(String(p.id)),
       ),
     );
+    const enrichedPosts = await enrichCommunityPostsFromRows(rows, posts);
     return res.status(200).json({
       status: true,
-      data: { posts, total: count, page: pageNum, limit: lim },
+      data: { posts: enrichedPosts, total: count, page: pageNum, limit: lim },
     });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
@@ -755,15 +815,28 @@ exports.getMembers = async (req, res) => {
       id: m.id,
       user_id: m.user_id,
       user_name: userDisplayName(m.user),
+      user_type: m.user?.user_type || null,
       user_avatar: authorAvatarUrl(m.user),
       avatar_url: authorAvatarUrl(m.user),
       role: m.role,
       joined_at: m.joined_at,
       is_active: m.is_active,
+      _author: m.user,
     }));
+
+    const authors = members.map((m) => m._author).filter(Boolean);
+    const [identityMap, tenantMap] = await Promise.all([
+      loadAcademicIdentityForUsers(authors),
+      loadTenantNameMap(authors.map((a) => a.tenant_id)),
+    ]);
+    const enrichedMembers = members.map((m) => {
+      const { _author, ...rest } = m;
+      return applyIdentityToFormattedUser(rest, _author, identityMap, tenantMap);
+    });
+
     return res.status(200).json({
       status: true,
-      data: { members, total: count, page: pageNum, limit: lim },
+      data: { members: enrichedMembers, total: count, page: pageNum, limit: lim },
     });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
@@ -871,9 +944,10 @@ exports.getPosts = async (req, res) => {
         bookmarkedSet.has(String(p.id)),
       ),
     );
+    const enrichedPosts = await enrichCommunityPostsFromRows(rows, posts);
     return res.status(200).json({
       status: true,
-      data: { posts, total: count, page: pageNum, limit: lim },
+      data: { posts: enrichedPosts, total: count, page: pageNum, limit: lim },
     });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
@@ -1150,6 +1224,34 @@ exports.getPostComments = async (req, res) => {
     const avatarMap = await loadAvatarMapForUserIds([...collectCommentUserIds(roots)]);
     const comments = roots.map((c) => applyAvatarMapToComment(c, avatarMap));
 
+    const authors = rows
+      .map((row) => {
+        const plain = row.toJSON ? row.toJSON() : row;
+        return plain.author || null;
+      })
+      .filter(Boolean);
+    const [identityMap, tenantMap] = await Promise.all([
+      loadAcademicIdentityForUsers(authors),
+      loadTenantNameMap(authors.map((a) => a.tenant_id)),
+    ]);
+    const authorByUserId = new Map();
+    for (const row of rows) {
+      const plain = row.toJSON ? row.toJSON() : row;
+      if (plain.author) authorByUserId.set(String(plain.user_id), plain.author);
+    }
+    const applyIdentityToComments = (nodes) => {
+      for (const node of nodes || []) {
+        applyIdentityToFormattedUser(
+          node,
+          authorByUserId.get(String(node.user_id)),
+          identityMap,
+          tenantMap,
+        );
+        applyIdentityToComments(node.replies);
+      }
+    };
+    applyIdentityToComments(comments);
+
     return res.status(200).json({
       status: true,
       data: { comments, total: topLevelCount, page: pageNum, limit: lim },
@@ -1212,8 +1314,14 @@ exports.createPostComment = async (req, res) => {
         reqUser: req.user,
         title: 'You were mentioned in a community comment',
         body: `${[req.user.first_name, req.user.last_name].filter(Boolean).join(' ') || 'Someone'} mentioned you`,
-        link_url: `/communities/${communityId}/posts/${postId}`,
-        metadata: { community_id: communityId, post_id: postId, comment_id: comment.id },
+        link_url: `/communities/${communityId}/posts/${postId}#comment-${comment.id}`,
+        metadata: {
+          community_id: communityId,
+          post_id: postId,
+          comment_id: comment.id,
+          entity_type: 'community_post',
+          entity_id: postId,
+        },
       });
     }
 

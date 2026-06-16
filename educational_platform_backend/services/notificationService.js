@@ -42,8 +42,8 @@ class NotificationService {
           linkUrl = `/profile/${actorId}`;
           break;
         case 'post_share':
-          title = 'Your post was shared';
-          body = `${actorName} shared your post`;
+          title = 'Your post was amplified';
+          body = `${actorName} amplified your post`;
           linkUrl = `/posts/${targetId}`;
           break;
         default:
@@ -59,6 +59,8 @@ class NotificationService {
         metadata: {
           actor_id: actorId,
           target_id: targetId,
+          entity_type: type === 'follow' ? 'profile' : 'post',
+          entity_id: type === 'follow' ? actorId : targetId,
           content_preview: content ? content.substring(0, 100) : null
         }
       });
@@ -114,6 +116,17 @@ class NotificationService {
         metadata: {
           actor_id: actorId,
           target_id: targetId,
+          entity_type:
+            type === 'connection_request'
+              ? 'connection'
+              : type === 'answer'
+                ? 'question'
+                : type === 'job_application'
+                  ? 'job_application'
+                  : 'profile',
+          entity_id: targetId,
+          connection_id: type === 'connection_request' ? targetId : undefined,
+          question_id: type === 'answer' ? targetId : undefined,
           ...additionalData
         }
       });
@@ -161,6 +174,8 @@ class NotificationService {
         metadata: {
           actor_id: actorId,
           thread_id: threadId,
+          entity_type: 'thread',
+          entity_id: threadId,
           message_preview: messagePreview
         }
       });
@@ -206,7 +221,17 @@ class NotificationService {
         title,
         body,
         link_url: linkUrl,
-        metadata: achievementData
+        metadata: {
+          ...achievementData,
+          entity_type: type === 'event_reminder' ? 'event' : type,
+          entity_id:
+            achievementData.eventId ||
+            achievementData.event_id ||
+            achievementData.courseId ||
+            achievementData.certificationId ||
+            null,
+          event_id: achievementData.eventId || achievementData.event_id || null,
+        }
       });
     } catch (error) {
       console.error('Error creating learning notification:', error);

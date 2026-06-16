@@ -16,31 +16,24 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import RichPostText from '@/components/RichPostText';
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
+import CodePostContent, { isCodePost } from '@/components/code/CodePostContent';
+import PostMedia from '@/components/posts/PostMedia';
 import CommentComposer from '@/components/comments/CommentComposer';
 import { contentWithoutHashtags, mergeDisplayHashtags } from '@/utils/socialText';
 import { buildMentionUserMap } from '@/utils/mentionUtils';
-import { SOCIAL_HASHTAG_BADGE_CLASS } from '@/utils/socialTokenStyles';
 import communitiesService from '@/services/communitiesService';
 import bookmarkService from '@/services/bookmarkService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfileNavigationOptional } from '@/contexts/ProfileNavigationContext';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from '@/components/ui/alert-dialog';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
 import {
   avatarOrFallback,
-  mediaOrFallback,
   formatTimeAgo,
   canModerateCommunity,
 } from './communityUtils';
-import ImageLightbox from './ImageLightbox';
+import { NOTIF_NAV_KEYS, consumeStringKey, peekStringKey } from '@/lib/notificationNavigation';
 
 const commentId = (id) => (id == null ? '' : String(id));
 
@@ -94,6 +87,7 @@ function CommentItem({
 
   return (
     <li
+      id={`community-comment-${comment.id}`}
       className={[
         'comm-thread-item',
         isNested ? 'comm-thread-item--nested' : 'comm-thread-item--root',
@@ -109,7 +103,7 @@ function CommentItem({
           <img
             src={avatarOrFallback(comment, undefined, currentUser)}
             alt=""
-            className={isNested ? 'comm-thread-item__avatar comm-thread-item__avatar--sm' : 'comm-thread-item__avatar'}
+            className="comm-thread-item__avatar"
           />
         </button>
 
@@ -127,6 +121,10 @@ function CommentItem({
             </span>
             <span className="comm-thread-item__time">{formatTimeAgo(comment.created_at)}</span>
           </div>
+          <AcademicIdentityLine
+            user={comment}
+            className="academic-identity-line--compact comm-post__identity-line"
+          />
 
           <RichPostText
             text={comment.content}
@@ -173,8 +171,8 @@ function CommentItem({
                 aria-hidden
               />
               {isExpanded
-                ? 'Hide replies'
-                : `View ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
+                ? `Hide ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+                : `Show ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
             </button>
 
             {isExpanded ? (
@@ -218,6 +216,8 @@ export default function CommunityPostCard({
   const { user } = useAuth();
   const profileNav = useProfileNavigationOptional();
   const [showComments, setShowComments] = useState(false);
+  const [highlightPost, setHighlightPost] = useState(false);
+  const [focusCommentId, setFocusCommentId] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -228,7 +228,6 @@ export default function CommunityPostCard({
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [pinSaving, setPinSaving] = useState(false);
   const [announceSaving, setAnnounceSaving] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -243,13 +242,13 @@ export default function CommunityPostCard({
 
   const postMentionMap = buildMentionUserMap(post.mentions);
   const displayTags = mergeDisplayHashtags(post.tags, post.content);
-  const displayContent = contentWithoutHashtags(post.content);
+  const codePost = isCodePost(post);
+  const displayContent = codePost ? '' : contentWithoutHashtags(post.content);
 
   const isAuthor = user && String(post.user_id) === String(user.id);
   const canMod = canModerateCommunity(community);
   const canEdit = isAuthor || canMod;
   const canDelete = isAuthor || canMod;
-  const imageSrc = post.image_url ? mediaOrFallback(post.image_url, '') : null;
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -263,6 +262,40 @@ export default function CommunityPostCard({
   useEffect(() => {
     setIsBookmarked(!!post.is_bookmarked);
   }, [post.id, post.is_bookmarked]);
+
+  useEffect(() => {
+    const targetPostId = peekStringKey(NOTIF_NAV_KEYS.COMMUNITY_POST_ID);
+    if (!targetPostId || String(targetPostId) !== String(post.id)) return;
+
+    consumeStringKey(NOTIF_NAV_KEYS.COMMUNITY_POST_ID);
+    setHighlightPost(true);
+    window.setTimeout(() => setHighlightPost(false), 3200);
+
+    if (consumeStringKey(NOTIF_NAV_KEYS.OPEN_COMMENTS)) {
+      setShowComments(true);
+    }
+
+    const commentId =
+      consumeStringKey(NOTIF_NAV_KEYS.COMMUNITY_COMMENT_ID) ||
+      consumeStringKey(NOTIF_NAV_KEYS.HIGHLIGHT_COMMENT);
+    if (commentId) setFocusCommentId(commentId);
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(`community-post-${post.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [post.id]);
+
+  useEffect(() => {
+    if (!focusCommentId || commentsLoading || comments.length === 0) return undefined;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`community-comment-${focusCommentId}`);
+      if (!el) return;
+      el.classList.add('comment-item--notif-target');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => el.classList.remove('comment-item--notif-target'), 3200);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [focusCommentId, commentsLoading, comments]);
 
   const openAuthorProfile = () => {
     if (post.user_id) profileNav?.openProfile?.(post.user_id);
@@ -469,14 +502,14 @@ export default function CommunityPostCard({
   };
 
   const cardClass = [
-    'comm-post animate-in fade-in duration-200',
+    'comm-post feed-post animate-in fade-in duration-200',
     post.is_pinned ? 'comm-post--pinned' : '',
     post.is_announcement ? 'comm-post--announcement' : '',
   ].join(' ');
 
   return (
     <>
-      <article className={cardClass}>
+      <article id={`community-post-${post.id}`} className={[cardClass, highlightPost ? 'feed-post--notif-target' : ''].filter(Boolean).join(' ')}>
         <div className="comm-post__inner">
           {(post.is_pinned || post.is_announcement) && !editing ? (
             <div className="comm-post__badges">
@@ -519,6 +552,10 @@ export default function CommunityPostCard({
                   {post.user_name || 'Member'}
                 </button>
               </div>
+              <AcademicIdentityLine
+                user={post}
+                className="academic-identity-line--compact comm-post__identity-line"
+              />
               <p className="comm-post__meta">
                 {formatTimeAgo(post.created_at)}
                 {post.updated_at && post.updated_at !== post.created_at ? ' · Edited' : ''}
@@ -538,8 +575,8 @@ export default function CommunityPostCard({
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
                 {menuOpen && (
-                  <div className="comm-post__menu-panel animate-in fade-in zoom-in-95 duration-100">
-                    <button type="button" onClick={handleShare} className="comm-post__menu-item">
+                  <div className="vh-action-menu vh-action-menu--align-right animate-in fade-in zoom-in-95 duration-100" style={{ top: 'calc(100% + 0.25rem)' }}>
+                    <button type="button" onClick={handleShare} className="vh-action-menu__item">
                       {shareCopied ? (
                         <Check className="h-4 w-4 text-emerald-600" />
                       ) : (
@@ -554,7 +591,7 @@ export default function CommunityPostCard({
                           setEditing(true);
                           setMenuOpen(false);
                         }}
-                        className="comm-post__menu-item"
+                        className="vh-action-menu__item"
                       >
                         <Pencil className="h-4 w-4 text-muted-foreground" />
                         Edit post
@@ -566,7 +603,7 @@ export default function CommunityPostCard({
                           type="button"
                           onClick={handleTogglePin}
                           disabled={pinSaving}
-                          className="comm-post__menu-item disabled:opacity-50"
+                          className="vh-action-menu__item disabled:opacity-50"
                         >
                           {pinSaving ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -579,7 +616,7 @@ export default function CommunityPostCard({
                           type="button"
                           onClick={handleToggleAnnouncement}
                           disabled={announceSaving}
-                          className="comm-post__menu-item disabled:opacity-50"
+                          className="vh-action-menu__item disabled:opacity-50"
                         >
                           {announceSaving ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -591,21 +628,21 @@ export default function CommunityPostCard({
                       </>
                     )}
                     {!isAuthor && (
-                      <button type="button" onClick={handleReport} className="comm-post__menu-item">
+                      <button type="button" onClick={handleReport} className="vh-action-menu__item">
                         <Flag className="h-4 w-4 text-muted-foreground" />
                         Report
                       </button>
                     )}
                     {canDelete && (
                       <>
-                        <div className="comm-post__menu-divider" />
+                        <div className="vh-action-menu__divider" />
                         <button
                           type="button"
                           onClick={() => {
                             setConfirmDelete(true);
                             setMenuOpen(false);
                           }}
-                          className="comm-post__menu-item comm-post__menu-item--danger"
+                          className="vh-action-menu__item vh-action-menu__item--danger"
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete post
@@ -657,98 +694,123 @@ export default function CommunityPostCard({
           ) : (
             <div className="comm-post__body">
               {post.title ? <h3 className="comm-post__title">{post.title}</h3> : null}
-              {displayContent ? (
+              {codePost ? (
+                <CodePostContent
+                  post={post}
+                  descriptionClassName="feed-post__content comm-post__content"
+                  mentionUserMap={postMentionMap}
+                  tagsSlot={
+                    displayTags.length > 0 ? (
+                      <div className="feed-post__tags">
+                        {displayTags.map((tag) => (
+                          <span key={tag} className="feed-post__tag">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null
+                  }
+                />
+              ) : displayContent ? (
                 <RichPostText
                   text={displayContent}
-                  className="comm-post__content"
+                  className="feed-post__content comm-post__content"
                   as="div"
                   mentionUserMap={postMentionMap}
                 />
               ) : null}
-              {displayTags.length > 0 ? (
-                <div className="comm-post__tags">
+              {!codePost && displayTags.length > 0 ? (
+                <div className="feed-post__tags">
                   {displayTags.map((tag) => (
-                    <span key={tag} className={SOCIAL_HASHTAG_BADGE_CLASS}>
+                    <span key={tag} className="feed-post__tag">
                       #{tag}
                     </span>
                   ))}
                 </div>
               ) : null}
-              {imageSrc ? (
-                <button
-                  type="button"
-                  onClick={() => setLightboxOpen(true)}
-                  className="comm-post__media"
-                  aria-label="View image"
-                >
-                  <img src={imageSrc} alt="" loading="lazy" />
-                </button>
+              {post.image_url ? (
+                <PostMedia mediaUrls={[post.image_url]} className="comm-post__media" />
               ) : null}
             </div>
           )}
 
           {!editing && (
-            <div className="comm-post__engage">
-              <button
-                type="button"
-                onClick={handleLikeClick}
-                disabled={!community?.is_member}
-                aria-pressed={post.is_liked}
-                className={[
-                  'comm-post__engage-btn group/like',
-                  post.is_liked ? 'comm-post__engage-btn--like-active' : '',
-                ].join(' ')}
-              >
-                <Heart
-                  className={`h-[1.125rem] w-[1.125rem] transition-transform group-hover/like:scale-110 ${post.is_liked ? 'fill-current' : ''}`}
-                />
-                <span className="comm-post__engage-count">{post.likes_count ?? 0}</span>
-              </button>
+            <>
+              <div className="feed-post__stats">
+                <div className="feed-post__stats-left">
+                  {(post.likes_count ?? 0) > 0 ? (
+                    <button type="button" onClick={handleLikeClick} disabled={!community?.is_member} className="feed-post__stats-btn">
+                      <span className="feed-post__like-pill" aria-hidden>
+                        <Heart className="fill-current" />
+                      </span>
+                      <span>{post.likes_count}</span>
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground/70">Be the first to like</span>
+                  )}
+                </div>
+                <div className="feed-post__stats-right">
+                  {(post.comments_count ?? 0) > 0 ? (
+                    <button type="button" onClick={toggleComments} className="feed-post__stats-btn">
+                      {post.comments_count} comment{post.comments_count === 1 ? '' : 's'}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={toggleComments}
-                aria-expanded={showComments}
-                className={[
-                  'comm-post__engage-btn',
-                  showComments ? 'comm-post__engage-btn--comment-active' : '',
-                ].join(' ')}
-              >
-                <MessageCircle className="h-[1.125rem] w-[1.125rem]" />
-                <span className="comm-post__engage-count">{post.comments_count ?? 0}</span>
-              </button>
+              <div className="feed-post__actions">
+                <button
+                  type="button"
+                  onClick={handleLikeClick}
+                  disabled={!community?.is_member}
+                  aria-pressed={post.is_liked}
+                  className={[
+                    'feed-post__action',
+                    post.is_liked ? 'feed-post__action--like-active' : '',
+                  ].join(' ')}
+                >
+                  <Heart className={post.is_liked ? 'fill-current' : ''} />
+                  <span>Like</span>
+                </button>
 
-              <button
-                type="button"
-                disabled={bookmarkBusy}
-                onClick={handleBookmark}
-                aria-pressed={isBookmarked}
-                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark post'}
-                className={[
-                  'comm-post__engage-btn',
-                  isBookmarked ? 'comm-post__engage-btn--bookmark-active' : '',
-                ].join(' ')}
-              >
-                <Bookmark className={`h-[1.125rem] w-[1.125rem] ${isBookmarked ? 'fill-current' : ''}`} />
-                <span className="hidden sm:inline">{isBookmarked ? 'Saved' : 'Save'}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={toggleComments}
+                  aria-expanded={showComments}
+                  className={[
+                    'feed-post__action',
+                    showComments ? 'feed-post__action--comment-active' : '',
+                  ].join(' ')}
+                >
+                  <MessageCircle className={showComments ? 'fill-current' : ''} />
+                  <span>Comment</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={copyPostLink}
-                className={[
-                  'comm-post__engage-btn comm-post__engage-btn--share',
-                  shareCopied ? 'comm-post__engage-btn--share-copied' : '',
-                ].join(' ')}
-              >
-                {shareCopied ? (
-                  <Check className="h-[1.125rem] w-[1.125rem]" />
-                ) : (
-                  <Share2 className="h-[1.125rem] w-[1.125rem]" />
-                )}
-                <span className="hidden sm:inline">{shareCopied ? 'Copied' : 'Share'}</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  disabled={bookmarkBusy}
+                  onClick={handleBookmark}
+                  aria-pressed={isBookmarked}
+                  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark post'}
+                  className={[
+                    'feed-post__action',
+                    isBookmarked ? 'feed-post__action--comment-active' : '',
+                  ].join(' ')}
+                >
+                  <Bookmark className={isBookmarked ? 'fill-current' : ''} />
+                  <span>{isBookmarked ? 'Saved' : 'Save'}</span>
+                </button>
+
+                <button type="button" onClick={copyPostLink} className="feed-post__action">
+                  {shareCopied ? (
+                    <Check className="h-[1.0625rem] w-[1.0625rem]" />
+                  ) : (
+                    <Share2 />
+                  )}
+                  <span>{shareCopied ? 'Copied' : 'Share'}</span>
+                </button>
+              </div>
+            </>
           )}
 
           {showComments && (
@@ -802,37 +864,36 @@ export default function CommunityPostCard({
         </div>
       </article>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove the post and all of its comments. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmedDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete post
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        {...CONFIRM_ACTION_PRESETS.deletePost}
+        onConfirm={handleConfirmedDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
 
-      <AlertDialog
+      <ConfirmActionDialog
         open={reportOpen}
-        onOpenChange={(open) => { if (!open && !reportSubmitting) { setReportOpen(false); setReportReason(''); } }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Report this post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tell us what's wrong with this post. Reports are reviewed by community moderators.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+        onOpenChange={(open) => {
+          if (!open && !reportSubmitting) {
+            setReportOpen(false);
+            setReportReason('');
+          }
+        }}
+        title={CONFIRM_ACTION_PRESETS.reportPost.title}
+        description="Tell us what's wrong with this post. Reports are reviewed by community moderators."
+        confirmLabel={CONFIRM_ACTION_PRESETS.reportPost.confirmLabel}
+        tone={CONFIRM_ACTION_PRESETS.reportPost.tone}
+        icon={CONFIRM_ACTION_PRESETS.reportPost.icon}
+        loading={reportSubmitting}
+        loadingLabel="Submitting…"
+        confirmDisabled={!reportReason.trim()}
+        onConfirm={() => void submitReport()}
+        onCancel={() => {
+          setReportOpen(false);
+          setReportReason('');
+        }}
+        contextSlot={(
           <textarea
             value={reportReason}
             onChange={(e) => setReportReason(e.target.value)}
@@ -840,24 +901,10 @@ export default function CommunityPostCard({
             rows={3}
             disabled={reportSubmitting}
             autoFocus
-            className="w-full resize-none rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/15"
+            className="confirm-action-dialog__context confirm-action-dialog__context--preview mt-0 w-full resize-none border border-border/60 bg-card px-3.5 py-2.5 text-left text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/15"
           />
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={reportSubmitting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={reportSubmitting || !reportReason.trim()}
-              onClick={(e) => { e.preventDefault(); void submitReport(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {reportSubmitting ? 'Submitting…' : 'Submit report'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {lightboxOpen && imageSrc ? (
-        <ImageLightbox src={imageSrc} alt={post.title || ''} onClose={() => setLightboxOpen(false)} />
-      ) : null}
+        )}
+      />
     </>
   );
 }

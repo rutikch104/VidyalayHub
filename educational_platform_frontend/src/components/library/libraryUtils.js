@@ -65,3 +65,30 @@ export function isPdfResource(doc) {
   const url = String(doc.file_url || doc.fileUrl || '').toLowerCase();
   return t === 'PDF' || url.endsWith('.pdf');
 }
+
+export function formatCompactCount(n) {
+  const value = Number(n) || 0;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(value);
+}
+
+export function getResourceCategoryLine(doc) {
+  const subject = String(doc.subject || '').trim();
+  const tags = Array.isArray(doc.tags) ? doc.tags.filter(Boolean) : [];
+  const tag = tags[0] ? String(tags[0]).trim() : '';
+  if (subject && tag) {
+    return `${subject.toUpperCase()} • ${tag.toUpperCase()}`;
+  }
+  if (subject) return subject.toUpperCase();
+  if (tag) return tag.toUpperCase();
+  if (doc.college && doc.college !== 'Shared') return String(doc.college).toUpperCase();
+  return '';
+}
+
+export function isResourceFeatured(doc) {
+  const likes = doc.likes ?? doc.likes_count ?? 0;
+  const downloads = doc.downloads ?? doc.downloads_count ?? 0;
+  const views = doc.views ?? doc.views_count ?? 0;
+  return likes >= 3 || downloads >= 5 || views >= 50;
+}

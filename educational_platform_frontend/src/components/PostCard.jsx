@@ -1,16 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  MessageCircle, Repeat2, Heart, MoreHorizontal, Share2, Bookmark, Award,
-  TrendingUp, Eye, Image, Video, FileText, Pencil, Trash2, X, Copy, Check,
+  MessageCircle, Repeat2, Heart, MoreHorizontal, Share2, Bookmark, BadgeCheck,
+  Image, Video, Code2, FileText, Pencil, Trash2, X, Megaphone, Check,
+  Building2, HelpCircle, Lock,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import postService, { resolveMediaUrl } from '@/services/postService';
+import postService from '@/services/postService';
 import ClickableUser from '@/components/ui/ClickableUser';
 import { PRESENCE_STATUS } from '@/lib/presence';
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
 import bookmarkService from '@/services/bookmarkService';
 import { emitNotificationsChanged } from '@/services/notificationService';
 import RichPostText from '@/components/RichPostText';
 import CommentSection from '@/components/comments/CommentSection';
+import CodePostContent, { isCodePost } from '@/components/code/CodePostContent';
+import PostMedia from '@/components/posts/PostMedia';
+import PostEngagementModal from '@/components/posts/PostEngagementModal';
+import AmplifyModal from '@/components/posts/AmplifyModal';
+import RemoveAmplifyDialog from '@/components/posts/RemoveAmplifyDialog';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
+import { contentWithoutHashtags, mergeDisplayHashtags } from '@/utils/socialText';
+import { NOTIF_NAV_KEYS, consumeStringKey, peekStringKey } from '@/lib/notificationNavigation';
 
 const FALLBACK_AVATAR =
   'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150';
@@ -32,102 +43,36 @@ function formatNumber(n) {
   return String(n);
 }
 
-/* ─── CodeBlock ─────────────────────────────────────────────────── */
-const CODE_SEPARATOR = '\n\n---\n\n';
-
-const LANG_META = {
-  javascript: { label: 'JavaScript', color: 'text-yellow-400', ext: 'js'    },
-  typescript: { label: 'TypeScript', color: 'text-blue-400',   ext: 'ts'    },
-  python:     { label: 'Python',     color: 'text-green-400',  ext: 'py'    },
-  java:       { label: 'Java',       color: 'text-orange-400', ext: 'java'  },
-  cpp:        { label: 'C++',        color: 'text-cyan-400',   ext: 'cpp'   },
-  csharp:     { label: 'C#',         color: 'text-violet-400', ext: 'cs'    },
-  go:         { label: 'Go',         color: 'text-sky-400',    ext: 'go'    },
-  rust:       { label: 'Rust',       color: 'text-orange-300', ext: 'rs'    },
-  php:        { label: 'PHP',        color: 'text-indigo-400', ext: 'php'   },
-  ruby:       { label: 'Ruby',       color: 'text-red-400',    ext: 'rb'    },
-  swift:      { label: 'Swift',      color: 'text-orange-500', ext: 'swift' },
-  kotlin:     { label: 'Kotlin',     color: 'text-violet-300', ext: 'kt'    },
-  html:       { label: 'HTML',       color: 'text-red-300',    ext: 'html'  },
-  css:        { label: 'CSS',        color: 'text-sky-300',    ext: 'css'   },
-  sql:        { label: 'SQL',        color: 'text-green-300',  ext: 'sql'   },
-};
-
-function parseCodeContent(raw) {
-  /* try multiple separator variants to survive backend whitespace normalization */
-  const SEPS = ['\n\n---\n\n', '\r\n\r\n---\r\n\r\n', '\n---\n', '\r\n---\r\n'];
-  for (const sep of SEPS) {
-    const idx = raw.indexOf(sep);
-    if (idx !== -1) {
-      return {
-        description: raw.slice(0, idx).trim(),
-        code: raw.slice(idx + sep.length),
-      };
-    }
-  }
-  return { description: '', code: raw };
+function formatRoleLabel(raw) {
+  if (!raw) return '';
+  return String(raw).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/* CodeBlock receives ONLY the raw code string — no description handling here */
-function CodeBlock({ content, language }) {
-  const [copied, setCopied] = useState(false);
+function isVerifiedAuthor(u) {
+  const t = String(u?.user_type || u?.role || u?.title || '').toLowerCase();
+  return ['teacher', 'faculty', 'admin', 'professor', 'institution', 'super'].some(k => t.includes(k));
+}
 
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard unavailable */ }
-  }, [content]);
-
-  const meta = language ? (LANG_META[language.toLowerCase()] ?? null) : null;
-  const langLabel = meta?.label ?? (language ? language.charAt(0).toUpperCase() + language.slice(1) : 'Code');
-  const langColor = meta?.color ?? 'text-violet-300';
-  const fileName = `snippet.${meta?.ext ?? 'txt'}`;
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-violet-300/30 bg-[#0d1117] shadow-md">
-
-      {/* ── Title bar ── */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#1c2128] px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-          </span>
-          <span className="font-mono text-[11px] text-gray-500">{fileName}</span>
-          <span className={`font-mono text-[11px] font-semibold ${langColor}`}>{langLabel}</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-all duration-150 hover:bg-white/8 hover:text-gray-200"
-          aria-label="Copy code"
-        >
-          {copied
-            ? <><Check className="h-3.5 w-3.5 text-green-400" /><span className="text-green-400">Copied</span></>
-            : <><Copy className="h-3.5 w-3.5" /><span>Copy</span></>
-          }
-        </button>
-      </div>
-
-      {/* ── Code ── */}
-      <pre className="max-h-[320px] overflow-y-auto overflow-x-auto px-4 py-4 text-[13px] leading-relaxed text-gray-100">
-        <code className="font-mono whitespace-pre">{content}</code>
-      </pre>
-    </div>
-  );
+function visibilityScope(post) {
+  if (post.visibility === 'college_only') return { label: 'College', Icon: Building2 };
+  if (post.visibility === 'private') return { label: 'Private', Icon: Lock };
+  return null;
 }
 
 /* ─── PostCard ──────────────────────────────────────────────────── */
-const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
+const PostCard = ({ post, embedded = false, onPostDeleted, onPostEdited, onNavigate, onAmplified }) => {
   const { user } = useAuth();
   const [isLiked,           setIsLiked]           = useState(post.is_liked);
   const [isBookmarked,      setIsBookmarked]       = useState(post.is_bookmarked);
   const [showComments,      setShowComments]       = useState(false);
   const [likesCount,        setLikesCount]         = useState(post.likes_count);
   const [commentsCount,     setCommentsCount]      = useState(post.comments_count);
+  const [repostsCount,      setRepostsCount]       = useState(post.reposts_count ?? 0);
+  const [isReposted,        setIsReposted]         = useState(post.is_reposted ?? false);
+  const [engagementModal,   setEngagementModal]    = useState(null);
+  const [amplifyOpen,       setAmplifyOpen]        = useState(false);
+  const [removeAmplifyOpen, setRemoveAmplifyOpen]   = useState(false);
+  const [amplifyRemoving,   setAmplifyRemoving]     = useState(false);
   const [loading,           setLoading]            = useState(false);
   const [shareFeedback,     setShareFeedback]      = useState('');
   const [menuOpen,          setMenuOpen]           = useState(false);
@@ -137,6 +82,8 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
   const [editSaving,        setEditSaving]         = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen]  = useState(false);
   const [deletingPost,      setDeletingPost]       = useState(false);
+  const [highlightPost,     setHighlightPost]      = useState(false);
+  const [focusCommentId,    setFocusCommentId]     = useState(null);
   const menuRef = useRef(null);
 
   const isOwner = user?.id && post.user?.id && String(user.id) === String(post.user.id);
@@ -145,8 +92,32 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
     setIsLiked(post.is_liked);
     setLikesCount(post.likes_count);
     setCommentsCount(post.comments_count);
+    setRepostsCount(post.reposts_count ?? 0);
+    setIsReposted(post.is_reposted ?? false);
     setIsBookmarked(post.is_bookmarked);
-  }, [post.id, post.is_liked, post.likes_count, post.comments_count, post.is_bookmarked]);
+  }, [post.id, post.is_liked, post.likes_count, post.comments_count, post.reposts_count, post.is_reposted, post.is_bookmarked]);
+
+  useEffect(() => {
+    const targetPostId = peekStringKey(NOTIF_NAV_KEYS.POST_ID) || peekStringKey('scroll_to_post_id');
+    if (!targetPostId || String(targetPostId) !== String(post.id)) return;
+
+    consumeStringKey(NOTIF_NAV_KEYS.POST_ID);
+    consumeStringKey('scroll_to_post_id');
+
+    if (consumeStringKey(NOTIF_NAV_KEYS.HIGHLIGHT_POST)) {
+      setHighlightPost(true);
+      window.setTimeout(() => setHighlightPost(false), 3200);
+    }
+
+    if (consumeStringKey(NOTIF_NAV_KEYS.OPEN_COMMENTS)) {
+      setShowComments(true);
+    }
+
+    const commentId =
+      consumeStringKey(NOTIF_NAV_KEYS.COMMENT_ID) ||
+      consumeStringKey(NOTIF_NAV_KEYS.HIGHLIGHT_COMMENT);
+    if (commentId) setFocusCommentId(commentId);
+  }, [post.id]);
 
   useEffect(() => {
     if (!editOpen) return;
@@ -180,11 +151,38 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
     }
   };
 
-  const handleRepost = async () => {
-    const line = (post.content || '').trim().slice(0, 120);
-    const text  = line ? `Repost: ${line}${line.length >= 120 ? '…' : ''}\n${postShareUrl}` : postShareUrl;
-    try { await navigator.clipboard.writeText(text); flashFeedback('Repost text copied'); }
-    catch { flashFeedback('Could not copy'); }
+  const handleAmplifyClick = () => {
+    if (isReposted) {
+      setRemoveAmplifyOpen(true);
+      return;
+    }
+    setAmplifyOpen(true);
+  };
+
+  const handleConfirmRemoveAmplify = async () => {
+    if (amplifyRemoving) return;
+    setAmplifyRemoving(true);
+    try {
+      const res = await postService.removeAmplify(post.id);
+      handleAmplified(res);
+      setRemoveAmplifyOpen(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAmplifyRemoving(false);
+    }
+  };
+
+  const handleAmplified = (res) => {
+    setIsReposted(res?.is_amplified ?? res?.is_reposted ?? false);
+    setRepostsCount(res?.amplifies_count ?? res?.reposts_count ?? repostsCount);
+    onAmplified?.(res);
+  };
+
+  const openEngagementModal = (type) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEngagementModal(type);
   };
 
   /* ── like / bookmark ── */
@@ -249,93 +247,116 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
 
   /* ── post type icon / label ── */
   const POST_TYPE_META = {
-    image:    { icon: <Image    className="h-3.5 w-3.5 text-sky-500"     />, label: 'Image' },
-    video:    { icon: <Video    className="h-3.5 w-3.5 text-emerald-500" />, label: 'Video' },
-    code:     { icon: <FileText className="h-3.5 w-3.5 text-violet-500"  />, label: `Code${post.code_language ? ` · ${post.code_language}` : ''}` },
-    question: { icon: <MessageCircle className="h-3.5 w-3.5 text-rose-500" />, label: 'Question' },
-    update:   { icon: <TrendingUp className="h-3.5 w-3.5 text-indigo-500" />, label: 'Update' },
+    image:    { icon: Image,         shortLabel: 'Image',        label: 'Image', color: 'text-sky-500' },
+    video:    { icon: Video,         shortLabel: 'Video',        label: 'Video', color: 'text-emerald-500' },
+    code:     { icon: Code2,         shortLabel: 'Code',         label: `Code${post.code_language ? ` · ${post.code_language}` : ''}`, color: 'text-violet-500' },
+    question: { icon: HelpCircle,    shortLabel: 'Question',     label: 'Question', color: 'text-rose-500' },
+    update:   { icon: Megaphone,     shortLabel: 'Announcement', label: 'Update', color: 'text-indigo-500' },
   };
-  const typeMeta = POST_TYPE_META[post.type] ?? {
-    icon: <FileText className="h-3.5 w-3.5 text-muted-foreground" />, label: 'Post',
-  };
+  const codePost = isCodePost(post);
+  const typeMeta = POST_TYPE_META[post.type] ?? (codePost ? POST_TYPE_META.code : {
+    icon: FileText, shortLabel: 'Post', label: 'Post', color: 'text-muted-foreground',
+  });
+  const TypeIcon = typeMeta.icon;
 
-  const visibilityLabel =
-    post.visibility === 'private' ? 'Private'
-    : post.visibility === 'college_only' ? 'College'
-    : 'Public';
-
-  const displayContent = (post.content || '').trim();
-
-  /* ── action button shared classes ── */
-  const actionBtn = (extraClass = '') =>
-    `post-action-btn ${extraClass}`;
+  const scope = visibilityScope(post);
+  const ScopeIcon = scope?.Icon;
+  const typeLabel = typeMeta?.shortLabel || typeMeta?.label;
+  const showTypeLabel = typeLabel && typeLabel !== 'Post';
+  const timeLabel = formatTimeAgo(post.created_at);
+  const displayTags = mergeDisplayHashtags(post.hashtags, post.content);
+  const bodyText = displayTags.length > 0 ? contentWithoutHashtags(post.content) : (post.content || '');
+  const displayContent = codePost ? '' : bodyText.trim();
 
   return (
     <article
       id={`post-${post.id}`}
-      className="social-feed-card group"
+      className={[
+        'social-feed-card feed-post group',
+        embedded ? 'feed-post--embedded' : '',
+        highlightPost ? 'feed-post--notif-target' : '',
+      ].filter(Boolean).join(' ')}
     >
-      {/* Share feedback toast */}
-      {shareFeedback && (
-        <div
-          className="mb-3 flex items-center justify-center gap-1.5 rounded-lg bg-foreground/90 px-3 py-2 text-xs font-medium text-background animate-fade-scale"
-          role="status"
-        >
-          {shareFeedback}
-        </div>
-      )}
+      {shareFeedback ? (
+        <div className="feed-post__toast" role="status">{shareFeedback}</div>
+      ) : null}
 
-      {/* ── Header ── */}
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex items-start gap-3">
+      <header className="feed-post__header">
+        <div className="feed-post__author-block">
           <ClickableUser
             userId={post.user?.id}
             name={post.user?.name}
             avatarUrl={post.user?.avatar_url || FALLBACK_AVATAR}
             size="md"
-            showStatus
+            showStatus={!embedded}
             status={PRESENCE_STATUS.ONLINE}
             className="shrink-0"
           />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className={[
+            'feed-post__author-meta',
+            embedded ? 'feed-post__author-meta--stacked' : '',
+          ].filter(Boolean).join(' ')}>
+            <div className="feed-post__name-row">
               <ClickableUser
                 userId={post.user?.id}
                 name={post.user?.name}
                 showName
                 showAvatar={false}
                 showStatus={false}
-                nameClassName="text-[14px] font-bold tracking-tight text-foreground"
+                nameClassName="feed-post__author-name"
                 className="inline-flex !gap-0 !p-0 hover:!bg-transparent"
               />
-              <Award className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[12px] font-medium text-muted-foreground">· {formatTimeAgo(post.created_at)}</span>
-              <span className="rounded-full bg-muted/70 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground ring-1 ring-border/40">
-                {visibilityLabel}
-              </span>
+              {!embedded ? (
+                <>
+                  <span className="feed-post__meta-sep feed-post__meta-sep--inline" aria-hidden>·</span>
+                  <time className="feed-post__time" dateTime={post.created_at}>
+                    {timeLabel}
+                  </time>
+                </>
+              ) : null}
+              {showTypeLabel && !embedded ? (
+                <>
+                  <span className="feed-post__meta-sep feed-post__meta-sep--inline" aria-hidden>·</span>
+                  <span className="feed-post__meta-type">
+                    <TypeIcon className={`h-3 w-3 ${typeMeta.color}`} aria-hidden />
+                    {typeLabel}
+                  </span>
+                </>
+              ) : null}
+              {isVerifiedAuthor(post.user) ? (
+                <span className="feed-post__verified" aria-label="Verified">
+                  <BadgeCheck strokeWidth={3} />
+                </span>
+              ) : null}
+              {scope && ScopeIcon && !embedded ? (
+                <span className="feed-post__scope-badge">
+                  <ScopeIcon aria-hidden />
+                  {scope.label}
+                </span>
+              ) : null}
             </div>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-[12.5px] font-medium text-muted-foreground tracking-tight">{post.user?.title || 'Student'}</p>
-              <span className="text-muted-foreground/40">·</span>
-              <div className="flex items-center gap-1">
-                {typeMeta.icon}
-                <span className="text-[11.5px] font-medium text-muted-foreground tracking-tight">{typeMeta.label}</span>
-              </div>
-            </div>
+            <AcademicIdentityLine
+              user={post.user}
+              className="academic-identity-line--feed feed-post__identity-line"
+              showProfessional={embedded}
+            />
+            {embedded ? (
+              <time className="feed-post__timestamp-stacked" dateTime={post.created_at}>
+                {timeLabel}
+              </time>
+            ) : null}
           </div>
         </div>
 
-        {/* Actions (bookmark + menu) */}
-        <div className="relative flex shrink-0 items-center gap-0.5" ref={menuRef}>
+        {!embedded ? (
+        <div className="feed-post__header-actions">
           <button
             type="button"
             onClick={handleBookmark}
             disabled={loading}
             className={[
-              'rounded-lg p-2 transition-all duration-150 active:scale-95',
-              isBookmarked
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-primary/5 hover:text-primary',
+              'feed-post__icon-btn',
+              isBookmarked ? 'feed-post__icon-btn--saved' : '',
               loading ? 'cursor-not-allowed opacity-50' : '',
             ].join(' ')}
             aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
@@ -343,199 +364,171 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
             <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            className="rounded-lg p-2 text-muted-foreground transition-colors duration-150 hover:bg-muted"
-            aria-expanded={menuOpen}
-            aria-haspopup="true"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          <div className="feed-post__menu-wrap" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(o => !o)}
+              className="feed-post__icon-btn"
+              aria-expanded={menuOpen}
+              aria-haspopup="true"
+              aria-label="Post options"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
 
-          {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[160px] overflow-hidden rounded-xl border border-border/60 bg-card py-1 shadow-elevated animate-fade-scale">
-              {isOwner ? (
-                <>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted/70"
-                    onClick={() => { setEditOpen(true); setMenuOpen(false); }}
-                  >
-                    <Pencil className="h-4 w-4 text-muted-foreground" />
-                    Edit post
-                  </button>
-                  <div className="my-1 border-t border-border/50" />
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/5"
-                    onClick={() => { setDeleteConfirmOpen(true); setMenuOpen(false); }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete post
-                  </button>
-                </>
-              ) : (
-                <span className="block px-4 py-2.5 text-xs text-muted-foreground">Post options</span>
-              )}
-            </div>
+            {menuOpen ? (
+              <div className="vh-action-menu vh-action-menu--align-right animate-fade-scale" style={{ top: 'calc(100% + 0.375rem)' }}>
+                {isOwner ? (
+                  <>
+                    <button
+                      type="button"
+                      className="vh-action-menu__item"
+                      onClick={() => { setEditOpen(true); setMenuOpen(false); }}
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                      Edit post
+                    </button>
+                    <button
+                      type="button"
+                      className="vh-action-menu__item vh-action-menu__item--danger"
+                      onClick={() => { setDeleteConfirmOpen(true); setMenuOpen(false); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete post
+                    </button>
+                  </>
+                ) : (
+                  <span className="vh-action-menu__item text-muted-foreground">Post options</span>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        ) : null}
+      </header>
+
+      {displayContent || codePost ? (
+        <div className="feed-post__body">
+          {codePost ? (
+            <CodePostContent
+              post={post}
+              tagsSlot={
+                displayTags.length > 0 ? (
+                  <div className="feed-post__tags">
+                    {displayTags.map(tag => (
+                      <span key={tag} className="feed-post__tag">#{tag}</span>
+                    ))}
+                  </div>
+                ) : null
+              }
+            />
+          ) : (
+            <RichPostText text={displayContent} className="feed-post__content" />
           )}
+        </div>
+      ) : null}
+
+      {displayTags.length > 0 && !codePost ? (
+        <div className="feed-post__tags">
+          {displayTags.map(tag => (
+            <span key={tag} className="feed-post__tag">#{tag}</span>
+          ))}
+        </div>
+      ) : null}
+
+      {post.media_urls && post.media_urls.length > 0 ? (
+        <PostMedia mediaUrls={post.media_urls} />
+      ) : null}
+
+      <div className="feed-post__stats">
+        <div className="feed-post__stats-left">
+          {likesCount > 0 ? (
+            <button
+              type="button"
+              onClick={openEngagementModal('likes')}
+              className="feed-post__stats-btn"
+              aria-label={`View ${likesCount} likes`}
+            >
+              <span className="feed-post__like-pill" aria-hidden>
+                <Heart className="fill-current" />
+              </span>
+              <span>
+                {formatNumber(likesCount)} {likesCount === 1 ? 'like' : 'likes'}
+              </span>
+            </button>
+          ) : (
+            <span className="feed-post__stats-muted">Be the first to like</span>
+          )}
+        </div>
+        <div className="feed-post__stats-right">
+          {commentsCount > 0 ? (
+            <button type="button" onClick={toggleComments} className="feed-post__stats-btn">
+              {formatNumber(commentsCount)} comment{commentsCount === 1 ? '' : 's'}
+            </button>
+          ) : null}
+          {commentsCount > 0 && repostsCount > 0 ? (
+            <span className="feed-post__meta-sep" aria-hidden>·</span>
+          ) : null}
+          {repostsCount > 0 ? (
+            <button
+              type="button"
+              onClick={openEngagementModal('reposts')}
+              className="feed-post__stats-btn"
+              aria-label={`View ${repostsCount} amplifies`}
+            >
+              {commentsCount === 0 ? (
+                <span className="feed-post__repost-pill" aria-hidden>
+                  <Megaphone />
+                </span>
+              ) : null}
+              <span>
+                {formatNumber(repostsCount)} amplify{repostsCount === 1 ? '' : 's'}
+              </span>
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {/* ── Content ── */}
-      {displayContent && (
-        <div className="mb-4">
-          {post.type === 'code' ? (() => {
-            const { description, code } = parseCodeContent(post.content);
-            return (
-              <>
-                {description ? (
-                  <RichPostText text={description} className="mb-3 text-sm leading-relaxed text-foreground" />
-                ) : null}
-                <CodeBlock content={code} language={post.code_language} />
-              </>
-            );
-          })() : (
-            <RichPostText text={post.content} className="text-sm leading-relaxed text-foreground" />
-          )}
-        </div>
-      )}
-
-      {/* ── Media ── */}
-      {post.media_urls && post.media_urls.length > 0 && (
-        <div className="mb-4 space-y-2 overflow-hidden rounded-xl border border-border/60 bg-muted/20">
-          {post.media_urls.map((media, idx) => {
-            const rawUrl = typeof media === 'string' ? media : (media.url || media.storage_key);
-            const url = resolveMediaUrl(
-              rawUrl && !String(rawUrl).startsWith('http') && media?.storage_key
-                ? `/media/${String(media.storage_key).replace(/^\/+/, '')}`
-                : rawUrl,
-            );
-            const explicitType = typeof media === 'string' ? 'image' : (media.type || 'image');
-            const isVideo = explicitType === 'video' || /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
-            const isImage =
-              !isVideo &&
-              (explicitType === 'image' ||
-                /\.(jpg|jpeg|png|gif|webp|svg|heic|heif|bmp)(\?|$)/i.test(url));
-
-            if (!url) return null;
-
-            if (isImage) {
-              return (
-                <img
-                  key={idx}
-                  src={url}
-                  alt="Post media"
-                  loading="lazy"
-                  className="max-h-[28rem] w-full bg-muted object-contain"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = '';
-                    e.currentTarget.alt = 'Image could not be loaded';
-                    e.currentTarget.className =
-                      'flex min-h-[120px] w-full items-center justify-center bg-muted px-4 py-8 text-center text-sm text-muted-foreground';
-                  }}
-                />
-              );
-            }
-            if (isVideo) {
-              return (
-                <video
-                  key={idx}
-                  src={url}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  className="max-h-[28rem] w-full bg-black object-contain"
-                />
-              );
-            }
-            return (
-              <a
-                key={idx}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full p-4 text-sm font-medium text-primary hover:underline"
-              >
-                View attachment
-                {typeof media === 'object' && media.metadata?.originalName
-                  ? `: ${media.metadata.originalName}`
-                  : ''}
-              </a>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Stats row ── */}
-      <div className="mb-3 flex items-center gap-4 border-y border-border/40 py-2.5 text-[12.5px] font-medium text-muted-foreground tracking-tight">
-        <button
-          type="button"
-          onClick={handleLike}
-          disabled={loading}
-          className="flex items-center gap-1.5 transition-colors hover:text-rose-500"
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500">
-            <Heart className="h-3 w-3 text-white" />
-          </span>
-          <span className="font-medium">{formatNumber(likesCount)}</span>
-        </button>
-        <button
-          type="button"
-          onClick={toggleComments}
-          className="flex items-center gap-1.5 transition-colors hover:text-primary"
-        >
-          <MessageCircle className="h-4 w-4" />
-          <span className="font-medium">{formatNumber(commentsCount)}</span>
-        </button>
-        <div className="flex items-center gap-1.5">
-          <Eye className="h-4 w-4" />
-          <span>{formatNumber(post.views_count)}</span>
-        </div>
-      </div>
-
-      {/* ── Action buttons ── */}
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="feed-post__actions">
         <button
           type="button"
           onClick={handleLike}
           disabled={loading}
           className={[
-            isLiked ? 'post-action-btn-like bg-rose-50 text-rose-600' : 'post-action-btn-like',
+            'feed-post__action',
+            isLiked ? 'feed-post__action--like-active' : '',
             loading ? 'cursor-not-allowed opacity-50' : '',
           ].join(' ')}
         >
-          <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
-          Like
+          <Heart className={isLiked ? 'fill-current' : ''} />
+          <span>Like</span>
         </button>
 
         <button
           type="button"
           onClick={toggleComments}
-          className="post-action-btn-comment"
+          className={['feed-post__action', showComments ? 'feed-post__action--comment-active' : ''].join(' ')}
         >
-          <MessageCircle className="h-4 w-4" />
-          Comment
+          <MessageCircle className={showComments ? 'fill-current' : ''} />
+          <span>Comment</span>
         </button>
 
         <button
           type="button"
-          onClick={handleRepost}
-          className="post-action-btn-repost"
+          onClick={handleAmplifyClick}
+          aria-pressed={isReposted}
+          className={[
+            'feed-post__action',
+            isReposted ? 'feed-post__action--repost-active' : '',
+          ].join(' ')}
         >
-          <Repeat2 className="h-4 w-4" />
-          Repost
+          {isReposted ? <Check className="h-[1.125rem] w-[1.125rem] stroke-[2.5]" /> : <Megaphone />}
+          <span>{isReposted ? 'Amplified' : 'Amplify'}</span>
         </button>
 
-        <button
-          type="button"
-          onClick={handleShare}
-          className="post-action-btn-share"
-        >
-          <Share2 className="h-4 w-4" />
-          Share
+        <button type="button" onClick={handleShare} className="feed-post__action">
+          <Share2 />
+          <span>Share</span>
         </button>
       </div>
 
@@ -545,6 +538,7 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
           postOwnerId={post.user?.id}
           commentsCount={commentsCount}
           onCommentsCountChange={setCommentsCount}
+          focusCommentId={focusCommentId}
         />
       )}
 
@@ -619,45 +613,48 @@ const PostCard = ({ post, onPostDeleted, onPostEdited, onNavigate }) => {
         </div>
       )}
 
-      {/* ── Delete confirm modal ── */}
-      {deleteConfirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !deletingPost && setDeleteConfirmOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-modal animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-              <Trash2 className="h-6 w-6 text-destructive" />
-            </div>
-            <h3 className="mt-3 text-[17px] font-bold tracking-tight text-foreground">Delete post?</h3>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted-foreground">
-              This action cannot be undone. Comments and likes will be permanently removed.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                className="app-btn-secondary"
-                onClick={() => setDeleteConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deletingPost}
-                className="btn-danger"
-                onClick={handleDeletePost}
-              >
-                {deletingPost ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmActionDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (!deletingPost) setDeleteConfirmOpen(open);
+        }}
+        title={CONFIRM_ACTION_PRESETS.deletePost.title}
+        description={CONFIRM_ACTION_PRESETS.deletePost.description}
+        confirmLabel={CONFIRM_ACTION_PRESETS.deletePost.confirmLabel}
+        tone={CONFIRM_ACTION_PRESETS.deletePost.tone}
+        icon={CONFIRM_ACTION_PRESETS.deletePost.icon}
+        loading={deletingPost}
+        loadingLabel="Deleting…"
+        onConfirm={handleDeletePost}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
+      <PostEngagementModal
+        open={engagementModal === 'likes'}
+        onOpenChange={(next) => setEngagementModal(next ? 'likes' : null)}
+        type="likes"
+        postId={post.id}
+        totalCount={likesCount}
+      />
+      <PostEngagementModal
+        open={engagementModal === 'reposts'}
+        onOpenChange={(next) => setEngagementModal(next ? 'reposts' : null)}
+        type="reposts"
+        postId={post.id}
+        totalCount={repostsCount}
+        titleNoun="amplify"
+      />
+      <AmplifyModal
+        open={amplifyOpen}
+        onOpenChange={setAmplifyOpen}
+        post={post}
+        onAmplified={handleAmplified}
+      />
+      <RemoveAmplifyDialog
+        open={removeAmplifyOpen}
+        onOpenChange={setRemoveAmplifyOpen}
+        loading={amplifyRemoving}
+        onConfirm={handleConfirmRemoveAmplify}
+      />
     </article>
   );
 };

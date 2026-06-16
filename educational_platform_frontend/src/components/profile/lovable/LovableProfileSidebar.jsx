@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Github,
   Linkedin,
@@ -6,15 +6,33 @@ import {
   Globe,
   Sparkles,
   ArrowRight,
-  UserPlus,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import connectionService from '@/services/connectionService';
 import feedService from '@/services/feedService';
+import { emitNotificationsChanged } from '@/services/notificationService';
 import { resolveMediaUrl } from '@/services/postService';
-import { useProfileNavigationOptional } from '@/contexts/ProfileNavigationContext';
+import { normalizeSuggestionPerson } from '@/lib/homeProfileCardHelpers';
+import HomeUserSuggestionCard from '@/components/home/HomeUserSuggestionCard';
+
+const SUGGESTION_AVATAR_FALLBACK =
+  'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150';
+
+function resolveSuggestionAvatar(url) {
+  return resolveMediaUrl(url || '') || url || SUGGESTION_AVATAR_FALLBACK;
+}
+
+function SuggestionsSkeleton({ rows = 3 }) {
+  return (
+    <div className="animate-pulse space-y-2.5 py-1">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-11 rounded-xl bg-muted" />
+      ))}
+    </div>
+  );
+}
 
 function RailCard({ children, className = '' }) {
   return (
@@ -42,11 +60,10 @@ export default function LovableProfileSidebar({
   onBoostProfile,
   onNavigate,
 }) {
-  const profileNav = useProfileNavigationOptional();
   const [suggestions, setSuggestions] = useState([]);
   const [trending, setTrending] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
-  const [connectingIds, setConnectingIds] = useState(new Set());
+  const [connectBusyId, setConnectBusyId] = useState(null);
 
   const links = [
     socialLinks.linkedin && { label: 'LinkedIn', href: socialLinks.linkedin, icon: Linkedin },
@@ -98,6 +115,24 @@ export default function LovableProfileSidebar({
           { tag: '#CampusHiring', count: 'Trending' },
         ];
 
+  const suggestionCards = useMemo(
+    () => suggestions.map((person) => normalizeSuggestionPerson(person, resolveSuggestionAvatar)),
+    [suggestions],
+  );
+
+  const handleConnect = useCallback(async (targetId) => {
+    setConnectBusyId(targetId);
+    try {
+      await connectionService.sendConnectionRequest(targetId);
+      setSuggestions((prev) => prev.filter((x) => String(x.id || x.user_id) !== targetId));
+      emitNotificationsChanged();
+    } catch {
+      /* user can retry */
+    } finally {
+      setConnectBusyId(null);
+    }
+  }, []);
+
   return (
     <aside className="space-y-4 lg:sticky lg:top-20 lg:z-10 lg:self-start">
       {!visitorMode ? (
@@ -134,82 +169,39 @@ export default function LovableProfileSidebar({
 
       {!visitorMode ? (
         <RailCard>
-          <RailCardTitle
-            action={
-              <button
-                type="button"
-                onClick={() => onNavigate?.('network')}
-                className="text-xs font-medium text-primary transition-opacity hover:opacity-75"
-              >
-                See all
-              </button>
-            }
-          >
-            People you may know
-          </RailCardTitle>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent shadow-xs">
+                <Users className="h-4 w-4 text-white" aria-hidden />
+              </div>
+              <h3 className="platform-rail-card__title">People you may know</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('network')}
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-brand-800"
+            >
+              Network
+            </button>
+          </div>
           {loadingSuggestions ? (
-            <div className="mt-3 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded-xl bg-muted" />
+            <SuggestionsSkeleton rows={3} />
+          ) : suggestions.length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground">
+              You&apos;re well connected! Check back later.
+            </p>
+          ) : (
+            <div className="home-user-suggestions">
+              {suggestionCards.map((person) => (
+                <HomeUserSuggestionCard
+                  key={person.id}
+                  person={person}
+                  connectBusy={connectBusyId === person.id}
+                  connected={false}
+                  onConnect={handleConnect}
+                />
               ))}
             </div>
-          ) : suggestions.length === 0 ? (
-            <p className="mt-3 text-xs text-muted-foreground">No suggestions right now.</p>
-          ) : (
-            <ul className="mt-3 space-y-1">
-              {suggestions.map((s) => {
-                const name = s.name || s.full_name || 'Member';
-                const avatar = resolveMediaUrl(s.avatar_url || s.avatar) || s.avatar_url || s.avatar;
-                return (
-                  <li key={s.id || s.user_id} className="group flex items-center gap-3 rounded-xl px-1 py-2 transition-colors hover:bg-muted/40">
-                    <Avatar className="h-9 w-9 shrink-0 ring-2 ring-background">
-                      {avatar ? <AvatarImage src={avatar} alt={name} /> : null}
-                      <AvatarFallback className="text-xs font-semibold">{name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const uid = s.id || s.user_id;
-                          if (profileNav?.openProfile) profileNav.openProfile(uid);
-                          else onNavigate?.('user-profile');
-                        }}
-                        className="block w-full truncate text-left text-sm font-semibold text-foreground transition-colors hover:text-primary"
-                      >
-                        {name}
-                      </button>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {[s.headline || s.role, s.mutual_count != null ? `${s.mutual_count} mutual` : null]
-                          .filter(Boolean)
-                          .join(' · ') || 'Suggested for you'}
-                      </p>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      disabled={connectingIds.has(s.id || s.user_id)}
-                      className="h-8 w-8 shrink-0 rounded-full border-border/60 transition-all hover:border-primary/40 hover:bg-primary/[0.08] hover:text-primary"
-                      aria-label="Connect"
-                      onClick={async () => {
-                        const uid = s.id || s.user_id;
-                        if (!uid || connectingIds.has(uid)) return;
-                        setConnectingIds((prev) => new Set(prev).add(uid));
-                        try {
-                          await connectionService.sendConnectionRequest(uid);
-                          setSuggestions((prev) => prev.filter((x) => (x.id || x.user_id) !== uid));
-                        } catch {
-                          /* ignore — user can retry */
-                        } finally {
-                          setConnectingIds((prev) => { const n = new Set(prev); n.delete(uid); return n; });
-                        }
-                      }}
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
           )}
         </RailCard>
       ) : null}

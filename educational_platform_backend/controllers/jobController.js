@@ -8,6 +8,11 @@ const { recordMediaAsset } = require('../services/mediaAssetService');
 const { mergeTenantWhere, denyIfCrossTenant, isPlatformUser } = require('../utils/tenantScope');
 const { buildVisibilityWhere } = require('../utils/tenantVisibility');
 const { tenantIdForCreate } = require('../utils/tenantHelpers');
+const {
+  syncJobSkills,
+  resolveSkillFilterNames,
+  parseSkillsInput,
+} = require('../services/jobSkillsService');
 
 function respondIfCrossTenant(res, req, resource) {
   const denial = denyIfCrossTenant(req, resource?.tenant_id);
@@ -176,34 +181,43 @@ exports.createJob = async (req, res) => {
     }
 
     const company_logo = await resolveCompanyLogoFromUpload(req);
+    const parsedSkills = parseSkillsInput(skills_required);
 
-    const job = await db.JobPost.create({
-      tenant_id,
-      posted_by,
-      title,
-      company_name,
-      company_logo,
-      category,
-      job_type,
-      location,
-      description,
-      requirements: requirements || [],
-      responsibilities: responsibilities || [],
-      benefits: benefits || [],
-      salary_range: parsedSalary || {},
-      experience_level,
-      education_level,
-      skills_required: skills_required || [],
-      tags: tags || [],
-      apply_url,
-      application_deadline: application_deadline ? new Date(application_deadline) : null,
-      is_remote: is_remote || false,
-      visa_sponsorship: visa_sponsorship || false,
-      relocation_assistance: relocation_assistance || false,
-      contact_email: contact_email && String(contact_email).trim() ? String(contact_email).trim() : null,
-      contact_phone,
-      visibility,
-      is_active: true
+    const job = await db.sequelize.transaction(async (transaction) => {
+      const created = await db.JobPost.create({
+        tenant_id,
+        posted_by,
+        title,
+        company_name,
+        company_logo,
+        category,
+        job_type,
+        location,
+        description,
+        requirements: requirements || [],
+        responsibilities: responsibilities || [],
+        benefits: benefits || [],
+        salary_range: parsedSalary || {},
+        experience_level,
+        education_level,
+        skills_required: [],
+        tags: tags || [],
+        apply_url,
+        application_deadline: application_deadline ? new Date(application_deadline) : null,
+        is_remote: is_remote || false,
+        visa_sponsorship: visa_sponsorship || false,
+        relocation_assistance: relocation_assistance || false,
+        contact_email: contact_email && String(contact_email).trim() ? String(contact_email).trim() : null,
+        contact_phone,
+        visibility,
+        is_active: true,
+      }, { transaction });
+
+      if (parsedSkills && parsedSkills.length) {
+        await syncJobSkills(created.id, parsedSkills, transaction);
+      }
+
+      return created;
     });
 
     // Fetch job with creator details
@@ -228,10 +242,12 @@ exports.createJob = async (req, res) => {
       data: shapeJobRow(jobWithDetails),
     });
   } catch (err) {
-    return res.status(500).json({
+    const status = err.status || 500;
+    return res.status(status).json({
       status: false,
-      message: 'Error creating job posting.',
-      error: err.message
+      message: err.message || 'Error creating job posting.',
+      error: err.message,
+      code: err.code,
     });
   }
 };
@@ -288,10 +304,13 @@ exports.getJobs = async (req, res) => {
     if (company_name) where.company_name = { [Op.iLike]: `%${company_name}%` };
     if (filter_tenant_id && isPlatformUser(req.user)) where.tenant_id = filter_tenant_id;
 
-    // Skills filter
+    // Skills filter (canonical names from master catalog)
     if (skills) {
       const skillsArray = Array.isArray(skills) ? skills : [skills];
-      where.skills_required = { [Op.overlap]: skillsArray };
+      const resolvedSkills = await resolveSkillFilterNames(skillsArray);
+      if (resolvedSkills.length) {
+        where.skills_required = { [Op.overlap]: resolvedSkills };
+      }
     }
 
     // Tags filter
@@ -481,9 +500,23 @@ exports.updateJob = async (req, res) => {
       }
     }
 
-    await job.update({
-      ...updateData,
-      updated_at: new Date()
+    const skillsPayload = updateData.skills_required;
+    if (skillsPayload !== undefined) {
+      delete updateData.skills_required;
+    }
+
+    await db.sequelize.transaction(async (transaction) => {
+      await job.update(
+        {
+          ...updateData,
+          updated_at: new Date(),
+        },
+        { transaction },
+      );
+
+      if (skillsPayload !== undefined) {
+        await syncJobSkills(job.id, skillsPayload, transaction);
+      }
     });
 
     // Fetch updated job with details
@@ -922,28 +955,58 @@ exports.getPopularJobSkills = async (req, res) => {
     const visibilityClause = isPlatformUser(req.user)
       ? {}
       : buildVisibilityWhere(req.user, { postedByField: 'posted_by' });
-    const jobs = await db.JobPost.findAll({
-      where: {
-        is_active: true,
-        ...(Object.keys(visibilityClause).length ? { [Op.and]: [visibilityClause] } : {}),
-      },
-      attributes: ['skills_required', 'tags'],
+    const visibilityWhere = {
+      is_active: true,
+      ...(Object.keys(visibilityClause).length ? { [Op.and]: [visibilityClause] } : {}),
+    };
+
+    const linkedSkills = await db.JobSkill.findAll({
+      attributes: ['skill_id'],
+      include: [
+        {
+          model: db.JobPost,
+          as: 'job',
+          attributes: [],
+          where: visibilityWhere,
+          required: true,
+        },
+        {
+          model: db.Skill,
+          as: 'skill',
+          attributes: ['skill_name'],
+          required: true,
+        },
+      ],
     });
 
     const skillCount = {};
-    const tagCount = {};
+    linkedSkills.forEach((row) => {
+      const name = row.skill?.skill_name;
+      if (!name) return;
+      skillCount[name] = (skillCount[name] || 0) + 1;
+    });
 
-    jobs.forEach(job => {
-      if (job.skills_required) {
-        job.skills_required.forEach(skill => {
+    if (!Object.keys(skillCount).length) {
+      const jobs = await db.JobPost.findAll({
+        where: visibilityWhere,
+        attributes: ['skills_required', 'tags'],
+      });
+      jobs.forEach((job) => {
+        (job.skills_required || []).forEach((skill) => {
           skillCount[skill] = (skillCount[skill] || 0) + 1;
         });
-      }
-      if (job.tags) {
-        job.tags.forEach(tag => {
-          tagCount[tag] = (tagCount[tag] || 0) + 1;
-        });
-      }
+      });
+    }
+
+    const jobsForTags = await db.JobPost.findAll({
+      where: visibilityWhere,
+      attributes: ['tags'],
+    });
+    const tagCount = {};
+    jobsForTags.forEach((job) => {
+      (job.tags || []).forEach((tag) => {
+        tagCount[tag] = (tagCount[tag] || 0) + 1;
+      });
     });
 
     const popularSkills = Object.entries(skillCount)

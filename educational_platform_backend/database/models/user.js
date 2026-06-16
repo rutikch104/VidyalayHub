@@ -92,6 +92,35 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
         },
+        registration_status: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'pending_approval',
+        },
+        registration_submitted_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        registration_reviewed_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        registration_reviewed_by: {
+            type: DataTypes.UUID,
+            allowNull: true,
+        },
+        registration_rejection_reason: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        registration_admin_notes: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        college_email: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
         app_settings: {
             type: DataTypes.JSONB,
             allowNull: true,
@@ -113,6 +142,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // Define associations
     User.associate = function (models) {
+        User.belongsTo(models.Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
         User.belongsTo(models.Role, { foreignKey: 'role_id', as: 'roleRef' });
         User.hasOne(models.StudentDetail, { foreignKey: 'user_id', as: 'studentDetails' });
         User.hasOne(models.TeacherDetail, { foreignKey: 'user_id', as: 'teacherDetails' });
@@ -124,6 +154,7 @@ module.exports = (sequelize, DataTypes) => {
         User.hasOne(models.UserTeachingInfo, { foreignKey: 'user_id', as: 'userTeachingInfo' });
         User.hasMany(models.UserProject, { foreignKey: 'user_id', as: 'userProjects' });
         User.hasMany(models.UserPublication, { foreignKey: 'user_id', as: 'userPublications' });
+        User.hasMany(models.UserRegistrationDocument, { foreignKey: 'user_id', as: 'registrationDocuments' });
     };
 
     return User;

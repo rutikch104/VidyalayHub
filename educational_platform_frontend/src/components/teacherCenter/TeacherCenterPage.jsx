@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from '@/components/ui/sonner';
+import { NOTIF_NAV_KEYS, consumeStringKey } from '@/lib/notificationNavigation';
 import {
   Search,
   Plus,
@@ -50,6 +52,23 @@ export default function TeacherCenterPage() {
 
   useEffect(() => {
     socialComposerService.getPopularHashtags().then(setPopularTags).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const questionId = consumeStringKey(NOTIF_NAV_KEYS.QUESTION_ID);
+    if (!questionId) return;
+    void (async () => {
+      setDetailLoading(true);
+      try {
+        const data = await globalQuestionService.getQuestion(questionId);
+        const full = data.question || data;
+        setDetailQuestion(full);
+      } catch {
+        toast.error('Content no longer available.');
+      } finally {
+        setDetailLoading(false);
+      }
+    })();
   }, []);
 
   const fetchQuestions = useCallback(async (pageNum = 1, append = false) => {

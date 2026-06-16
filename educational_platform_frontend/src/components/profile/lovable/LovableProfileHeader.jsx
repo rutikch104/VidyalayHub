@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { resolveMediaUrl } from '@/services/postService';
+import { resolveAcademicIdentityFromProfile } from '@/lib/academicIdentity';
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -60,28 +62,32 @@ function displayWebsite(url) {
   }
 }
 
+function resolveCustomProfileHeadline(profileData, academicIdentity) {
+  const raw = profileData?.headline?.trim();
+  if (!raw || /^student$|^teacher$|^alumni$|^staff$/i.test(raw)) return null;
+  if (academicIdentity && raw.toLowerCase() === String(academicIdentity).trim().toLowerCase()) {
+    return null;
+  }
+  return raw;
+}
+
 /* Cover text only shown on the DEFAULT gradient cover (no custom image) */
 function buildCoverHeadline(profileData) {
   if (profileData?.coverHeadline) return profileData.coverHeadline;
-  if (profileData?.headline && profileData.headline.length > 8) return profileData.headline;
-  if (profileData?.title && profileData.title.length > 8) return profileData.title;
-  const role = profileData?.userType
-    ? String(profileData.userType).charAt(0).toUpperCase() + String(profileData.userType).slice(1)
-    : null;
-  const institution = profileData?.tenant_name || profileData?.academicInfo?.university;
-  if (role && institution) return `${role} at ${institution}`;
-  if (institution) return institution;
-  return null;
+  const identity = resolveAcademicIdentityFromProfile(profileData);
+  if (identity) return identity;
+  const customHeadline = resolveCustomProfileHeadline(profileData, identity);
+  if (customHeadline && customHeadline.length > 8) return customHeadline;
+  return profileData?.name || null;
 }
 
-function buildCoverSubline(profileData, skillTags) {
+function buildCoverSubline(profileData, skillTags, academicIdentity) {
   if (profileData?.coverSubline) return profileData.coverSubline;
+  const customHeadline = resolveCustomProfileHeadline(profileData, academicIdentity);
+  if (customHeadline) return customHeadline;
   if (skillTags && skillTags.length >= 2) {
     return skillTags.slice(0, 6).map((s) => String(s).toUpperCase()).join(' · ');
   }
-  const course = profileData?.academicInfo?.course;
-  const year = profileData?.academicInfo?.graduationYear;
-  if (course) return [course, year ? `Class of ${year}` : null].filter(Boolean).join(' · ').toUpperCase();
   return null;
 }
 
@@ -115,14 +121,14 @@ export default function LovableProfileHeader({
   const avatarSrc = profileData?.avatar ? resolveMediaUrl(profileData.avatar) || profileData.avatar : null;
 
   const roleBadge = activeRole || 'Student';
-  const headline =
-    profileData?.headline ||
-    profileData?.title ||
-    `${roleBadge} · ${profileData?.academicInfo?.university || profileData?.tenant_name || 'Vidyalaya Hub'}`;
+  const userType = profileData?.userType || profileData?.user_type;
+  const splitIdentityWithHeadline = userType === 'alumni' || userType === 'teacher';
+  const academicIdentity = resolveAcademicIdentityFromProfile(profileData);
+  const customHeadline = resolveCustomProfileHeadline(profileData, academicIdentity);
 
   /* Cover text is ONLY shown on default gradient (no custom image) — avoids conflict with cover images */
   const bannerHeadline = !hasCustomCover ? buildCoverHeadline(profileData) : null;
-  const bannerSubline = !hasCustomCover ? buildCoverSubline(profileData, skillTags) : null;
+  const bannerSubline = !hasCustomCover ? buildCoverSubline(profileData, skillTags, academicIdentity) : null;
 
   const isConnected = connectionStatus === 'connected';
   const isPending = connectionStatus === 'pending';
@@ -407,8 +413,43 @@ export default function LovableProfileHeader({
               <span className="premium-profile-header__role-pill">{roleBadge}</span>
             </div>
 
-            {/* Headline */}
-            <p className="premium-profile-header__headline mt-1.5">{headline}</p>
+            {/* Identity: academic → headline → professional (alumni/teacher) */}
+            {splitIdentityWithHeadline ? (
+              <>
+                {academicIdentity ? (
+                  <AcademicIdentityLine
+                    profile={profileData}
+                    showProfessional={false}
+                    className="premium-profile-header__headline academic-identity-line--profile mt-1.5"
+                  />
+                ) : customHeadline ? (
+                  <p className="premium-profile-header__headline mt-1.5">{customHeadline}</p>
+                ) : null}
+                {academicIdentity && customHeadline ? (
+                  <p className="premium-profile-header__custom-headline mt-1">{customHeadline}</p>
+                ) : null}
+                <AcademicIdentityLine
+                  profile={profileData}
+                  showAcademic={false}
+                  professionalClassName="professional-identity-line--profile mt-1"
+                />
+              </>
+            ) : (
+              <>
+                {academicIdentity ? (
+                  <AcademicIdentityLine
+                    profile={profileData}
+                    showProfessional={false}
+                    className="premium-profile-header__headline academic-identity-line--profile mt-1.5"
+                  />
+                ) : customHeadline ? (
+                  <p className="premium-profile-header__headline mt-1.5">{customHeadline}</p>
+                ) : null}
+                {academicIdentity && customHeadline ? (
+                  <p className="premium-profile-header__custom-headline mt-1">{customHeadline}</p>
+                ) : null}
+              </>
+            )}
 
             {/* Mutual connections (visitor mode) */}
             {visitorMode && mutualConnections > 0 && (

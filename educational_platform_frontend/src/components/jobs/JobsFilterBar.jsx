@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { JOB_TYPES, JOB_CATEGORIES } from './jobUtils';
+import PlatformSelect from '@/components/ui/PlatformSelect';
 
 const LOCATIONS = ['Remote', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Pune', 'Chennai'];
 
@@ -42,6 +43,7 @@ export default function JobsFilterBar({
   remoteOnly,
   onRemoteOnlyChange,
   popularSkills = [],
+  selectedSkill = '',
   onSkillClick,
   onClearAll,
   activeFilterCount = 0,
@@ -77,7 +79,7 @@ export default function JobsFilterBar({
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <FilterField label="Category" icon={Layers} className="xl:col-span-1">
-          <select
+          <PlatformSelect
             value={category}
             onChange={(e) => onCategoryChange(e.target.value)}
             className="jobs-filter-select"
@@ -88,11 +90,11 @@ export default function JobsFilterBar({
                 {c.label}
               </option>
             ))}
-          </select>
+          </PlatformSelect>
         </FilterField>
 
         <FilterField label="Job type" icon={Briefcase}>
-          <select
+          <PlatformSelect
             value={jobType}
             onChange={(e) => onJobTypeChange(e.target.value)}
             className="jobs-filter-select"
@@ -103,11 +105,11 @@ export default function JobsFilterBar({
                 {t.label}
               </option>
             ))}
-          </select>
+          </PlatformSelect>
         </FilterField>
 
         <FilterField label="Location" icon={MapPin}>
-          <select
+          <PlatformSelect
             value={location}
             onChange={(e) => onLocationChange(e.target.value)}
             className="jobs-filter-select"
@@ -118,11 +120,11 @@ export default function JobsFilterBar({
                 {loc}
               </option>
             ))}
-          </select>
+          </PlatformSelect>
         </FilterField>
 
         <FilterField label="Experience" icon={GraduationCap}>
-          <select
+          <PlatformSelect
             value={experience}
             onChange={(e) => onExperienceChange(e.target.value)}
             className="jobs-filter-select"
@@ -131,15 +133,15 @@ export default function JobsFilterBar({
             <option value="entry">Entry</option>
             <option value="mid">Mid</option>
             <option value="senior">Senior</option>
-          </select>
+          </PlatformSelect>
         </FilterField>
 
         <FilterField label="Sort by" icon={ArrowUpDown}>
-          <select value={sort} onChange={(e) => onSortChange(e.target.value)} className="jobs-filter-select">
+          <PlatformSelect value={sort} onChange={(e) => onSortChange(e.target.value)} className="jobs-filter-select">
             <option value="latest">Latest</option>
             <option value="deadline">Deadline</option>
             <option value="salary_high">Salary (high)</option>
-          </select>
+          </PlatformSelect>
         </FilterField>
 
         <FilterField label="Work mode" icon={Wifi} className="flex flex-col justify-end">
@@ -178,6 +180,9 @@ export default function JobsFilterBar({
           {remoteOnly && (
             <ActiveChip label="Remote" onRemove={() => onRemoteOnlyChange(false)} />
           )}
+          {selectedSkill ? (
+            <ActiveChip label={selectedSkill} onRemove={() => onSkillClick(selectedSkill)} />
+          ) : null}
           {sort !== 'latest' && (
             <ActiveChip
               label={sort === 'deadline' ? 'By deadline' : 'Salary ↑'}
@@ -201,7 +206,8 @@ export default function JobsFilterBar({
                 key={skill}
                 type="button"
                 onClick={() => onSkillClick(skill)}
-                className="jobs-skill-chip"
+                className={`jobs-skill-chip${selectedSkill === skill ? ' jobs-skill-chip--active' : ''}`}
+                aria-pressed={selectedSkill === skill}
               >
                 {skill}
               </button>

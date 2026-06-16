@@ -79,6 +79,8 @@ type College = {
   type: string;
   location: string;
   domain?: string;
+  logo_url?: string | null;
+  logo_storage_key?: string | null;
   admin?: { name: string; email: string; phone?: string };
   users: { students: number; teachers: number; staff: number };
   subscription?: { plan: string; status: string; expiryDate: string; monthlyFee: number };
@@ -432,7 +434,15 @@ export default function SuperAdminDashboard() {
                     <div className="sa-college-card__head">
                       <div className="sa-college-card__brand">
                         <div className="sa-college-card__logo" aria-hidden>
-                          <Building className="h-7 w-7" />
+                          {college.logo_url ? (
+                            <img
+                              src={college.logo_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <Building className="h-7 w-7" />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <h3 className="sa-college-card__name">{college.name}</h3>

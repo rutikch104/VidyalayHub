@@ -1,11 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { Heart, MoreHorizontal, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
+import {
+  BadgeCheck,
+  Heart,
+  MoreHorizontal,
+  Pencil,
+  Reply,
+  Trash2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import RichPostText from '@/components/RichPostText';
 import CommentComposer from '@/components/comments/CommentComposer';
 import { COPY } from '@/lib/copy';
 import ClickableUser from '@/components/ui/ClickableUser';
 import { PRESENCE_STATUS } from '@/lib/presence';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  buildCommentMetaParts,
+  formatCommentRoleBadge,
+  isVerifiedCommentAuthor,
+} from '@/lib/commentAuthorMeta';
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
+import { cn } from '@/lib/utils';
 
 const FALLBACK_AVATAR =
   'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150';
@@ -25,6 +40,12 @@ function countAllReplies(comment) {
   return replies.reduce((n, r) => n + 1 + countAllReplies(r), 0);
 }
 
+function roleBadgeClass(role) {
+  if (role === 'FACULTY') return 'comment-role-badge comment-role-badge--faculty';
+  if (role === 'ALUMNI') return 'comment-role-badge comment-role-badge--alumni';
+  return 'comment-role-badge';
+}
+
 export default function CommentItem({
   comment,
   depth = 0,
@@ -39,6 +60,7 @@ export default function CommentItem({
   deletingId,
   savingId,
 }) {
+  const { user: currentUser } = useAuth();
   const [showReply, setShowReply] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
@@ -57,6 +79,12 @@ export default function CommentItem({
   const canEdit = isAuthor;
   const isNested = depth > 0;
   const maxNest = 3;
+
+  const roleBadge = formatCommentRoleBadge(comment.user?.user_type || comment.user?.role);
+  const metaParts = buildCommentMetaParts();
+  const timeLabel = formatTimeAgo(comment.created_at);
+  const showRepliesToggle = replyCount > 0 && depth < maxNest;
+  const hasMenu = canEdit || canDelete;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -104,6 +132,8 @@ export default function CommentItem({
     comment.created_at &&
     new Date(comment.updated_at).getTime() - new Date(comment.created_at).getTime() > 2000;
 
+  const likesCount = comment.likes_count ?? 0;
+
   return (
     <article
       className={`comment-item ${isNested ? 'comment-item-nested' : ''}`}
@@ -114,25 +144,107 @@ export default function CommentItem({
           userId={comment.user?.id}
           name={comment.user?.name || 'Member'}
           avatarUrl={comment.user?.avatar_url || FALLBACK_AVATAR}
-          size={isNested ? 'xs' : 'comment'}
+          size="comment"
           status={PRESENCE_STATUS.ONLINE}
-          showStatus={!isNested}
-          className={isNested ? 'comment-avatar-slot-sm' : 'comment-avatar-slot'}
+          showStatus
+          className="comment-avatar-slot"
         />
 
         <div className="comment-bubble">
-          <div className="comment-meta">
-            <ClickableUser
-              userId={comment.user?.id}
-              name={comment.user?.name || 'Member'}
-              showName
-              showAvatar={false}
-              showStatus={false}
-              nameClassName="comment-author !font-semibold"
-              className="inline-flex !gap-0 !p-0 hover:!bg-transparent"
-            />
-            <span className="comment-time">{formatTimeAgo(comment.created_at)}</span>
-            {edited && <span className="comment-edited">· {COPY.comments.edited}</span>}
+          <div className="comment-bubble__top">
+            <div className="comment-bubble__identity">
+              <div className="comment-header-row">
+                <ClickableUser
+                  userId={comment.user?.id}
+                  name={comment.user?.name || 'Member'}
+                  showName
+                  showAvatar={false}
+                  showStatus={false}
+                  nameClassName="comment-author"
+                  className="inline-flex !gap-0 !p-0 hover:!bg-transparent"
+                />
+                {isVerifiedCommentAuthor(comment.user) ? (
+                  <span className="comment-verified" aria-label="Verified">
+                    <BadgeCheck strokeWidth={3} />
+                  </span>
+                ) : null}
+                {roleBadge ? <span className={roleBadgeClass(roleBadge)}>{roleBadge}</span> : null}
+              </div>
+
+              <AcademicIdentityLine
+                user={comment.user}
+                className="academic-identity-line--compact comment-identity-line"
+              />
+
+              <p className="comment-meta-line">
+                {metaParts.map((part, idx) => (
+                  <span key={`meta-${idx}`}>
+                    {idx > 0 ? <span className="comment-meta-sep" aria-hidden> · </span> : null}
+                    {part}
+                  </span>
+                ))}
+                {metaParts.length > 0 ? (
+                  <span className="comment-meta-sep" aria-hidden> · </span>
+                ) : null}
+                <span>{timeLabel}</span>
+                {edited ? (
+                  <>
+                    <span className="comment-meta-sep" aria-hidden> · </span>
+                    <span className="comment-edited">{COPY.comments.edited}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+
+            {hasMenu ? (
+              <div className="comment-bubble__menu" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((o) => !o)}
+                  className="comment-menu-btn"
+                  aria-expanded={menuOpen}
+                  aria-label="Comment options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      className="vh-action-menu vh-action-menu--align-right"
+                      style={{ top: 'calc(100% + 0.25rem)' }}
+                    >
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                          onClick={() => {
+                            setEditing(true);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          {COPY.comments.edit}
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          className="vh-action-menu__item vh-action-menu__item--danger"
+                          onClick={() => setConfirmDelete(true)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {COPY.comments.delete}
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : null}
           </div>
 
           {editing ? (
@@ -151,7 +263,14 @@ export default function CommentItem({
                   type="button"
                   onClick={handleSaveEdit}
                   disabled={!editText.trim() || savingId === comment.id}
-                  className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                  className={cn(
+                    'comment-composer-card__post',
+                    editText.trim() || savingId === comment.id
+                      ? 'comment-composer-card__post--ready'
+                      : 'comment-composer-card__post--disabled',
+                    savingId === comment.id && 'comment-composer-card__post--loading',
+                  )}
+                  aria-busy={savingId === comment.id}
                 >
                   {savingId === comment.id ? COPY.comments.saving : COPY.comments.save}
                 </button>
@@ -167,66 +286,36 @@ export default function CommentItem({
                 type="button"
                 onClick={() => onLike?.(comment.id)}
                 disabled={likingId === comment.id}
-                className={`comment-action inline-flex items-center gap-1 ${comment.is_liked ? 'comment-action-active' : ''}`}
+                className={`comment-action ${comment.is_liked ? 'comment-action--liked' : ''}`}
+                aria-pressed={Boolean(comment.is_liked)}
               >
-                <Heart className={`h-3.5 w-3.5 ${comment.is_liked ? 'fill-current' : ''}`} />
-                {(comment.likes_count ?? 0) > 0 ? comment.likes_count : COPY.comments.like}
+                <Heart className={comment.is_liked ? 'fill-current' : ''} />
+                {likesCount > 0 ? likesCount : COPY.comments.like}
               </button>
+
               {depth < maxNest && (
                 <button
                   type="button"
                   onClick={() => setShowReply((v) => !v)}
                   className="comment-action"
+                  aria-expanded={showReply}
                 >
+                  <Reply aria-hidden />
                   {COPY.comments.reply}
                 </button>
               )}
-              {(canEdit || canDelete) && (
-                <div className="relative ml-auto" ref={menuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setMenuOpen((o) => !o)}
-                    className="comment-action p-1"
-                    aria-expanded={menuOpen}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                  <AnimatePresence>
-                    {menuOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-full z-30 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg"
-                      >
-                        {canEdit && (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                            onClick={() => {
-                              setEditing(true);
-                              setMenuOpen(false);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                            {COPY.comments.edit}
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
-                            onClick={() => setConfirmDelete(true)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {COPY.comments.delete}
-                          </button>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+
+              {showRepliesToggle && (
+                <button
+                  type="button"
+                  onClick={() => setRepliesExpanded((v) => !v)}
+                  className="comment-replies-toggle"
+                  aria-expanded={repliesExpanded}
+                >
+                  {repliesExpanded
+                    ? COPY.comments.hideReplies(replyCount)
+                    : COPY.comments.showReplies(replyCount)}
+                </button>
               )}
             </div>
           )}
@@ -281,26 +370,6 @@ export default function CommentItem({
               </motion.div>
             )}
           </AnimatePresence>
-
-          {replyCount > 0 && depth < maxNest && (
-            <button
-              type="button"
-              onClick={() => setRepliesExpanded((v) => !v)}
-              className="comment-reply-toggle"
-            >
-              {repliesExpanded ? (
-                <>
-                  <ChevronUp className="h-3.5 w-3.5" />
-                  {COPY.comments.hideReplies}
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-3.5 w-3.5" />
-                  {COPY.comments.showReplies(replyCount)}
-                </>
-              )}
-            </button>
-          )}
         </div>
       </div>
 

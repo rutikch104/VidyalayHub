@@ -20,6 +20,7 @@ router.delete('/delete-multiple', notificationController.deleteMultipleNotificat
 router.post('/bulk-operations', notificationController.bulkNotificationOperations);
 router.post('/create', notificationController.createNotification);
 
+router.get('/:notification_id/target', notificationController.resolveNotificationTarget);
 router.put('/:notification_id/read', notificationController.markAsRead);
 router.delete('/:notification_id', notificationController.deleteNotification);
 

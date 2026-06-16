@@ -9,6 +9,9 @@ export const JOB_TYPES = [
   { id: 'freelance', label: 'Freelance' },
 ];
 
+export const JOB_SKILLS_MAX = 15;
+export const JOB_SKILLS_RECOMMENDED = 10;
+
 export const JOB_CATEGORIES = [
   { id: 'internship', label: 'Internship' },
   { id: 'full_time', label: 'Full-time role' },
@@ -60,11 +63,42 @@ export function experienceLevelLabel(level) {
   if (!level) return null;
   const map = {
     entry: 'Entry level',
+    junior: '1-2 years',
+    'mid-level': '2-5 years',
     mid: 'Mid level',
-    senior: 'Senior',
+    senior: '5+ years',
+    lead: 'Lead',
     executive: 'Executive',
   };
   return map[level] || String(level).replace(/_/g, ' ');
+}
+
+export function companyInitials(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+export function workModeLabel(job) {
+  if (job?.is_remote) return 'Remote';
+  return 'On-site';
+}
+
+export function isJobNew(job) {
+  if (!job?.created_at) return false;
+  const diff = Date.now() - new Date(job.created_at).getTime();
+  return diff < 7 * 24 * 60 * 60 * 1000;
+}
+
+export function formatCompactCount(n) {
+  const value = Number(n) || 0;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(value);
 }
 
 export function formatTimeAgo(dateString) {

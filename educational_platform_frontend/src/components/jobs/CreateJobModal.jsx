@@ -5,6 +5,7 @@ import {
   Calendar, Globe, Lock, Briefcase, GraduationCap, AlertCircle, ImagePlus,
 } from 'lucide-react';
 import { JOB_TYPES, JOB_CATEGORIES } from './jobUtils';
+import JobSkillsPicker from './JobSkillsPicker';
 
 const EMPTY = {
   title: '',
@@ -21,6 +22,7 @@ const EMPTY = {
   salary_currency: 'INR',
   application_deadline: '',
   company_logo: null,
+  skills: [],
 };
 
 const INPUT =
@@ -142,6 +144,7 @@ export default function CreateJobModal({ open, onClose, onSubmit }) {
         application_deadline: form.application_deadline || undefined,
         experience_level: 'entry',
         education_level: 'bachelor',
+        skills_required: form.skills.map((s) => s.skill_name),
       });
       resetForm();
       onClose();
@@ -364,6 +367,15 @@ export default function CreateJobModal({ open, onClose, onSubmit }) {
                 rows={5}
                 placeholder="Describe responsibilities, team culture, and what success looks like in this role…"
                 className={`${INPUT} resize-none`}
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Skills required</FieldLabel>
+              <JobSkillsPicker
+                skills={form.skills}
+                onChange={(skills) => set('skills', skills)}
+                disabled={submitting}
               />
             </div>
 

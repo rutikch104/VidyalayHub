@@ -10,19 +10,19 @@ import {
   Loader2,
   AtSign,
   Globe,
-  Building2,
   Lock,
-  Paperclip,
   Code2,
   HelpCircle,
   Megaphone,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { resolveMediaUrl } from '@/services/postService';
-import UserAvatar, { PresenceLabel } from '@/components/ui/UserAvatar';
-import { PRESENCE_STATUS } from '@/lib/presence';
+import UserAvatar from '@/components/ui/UserAvatar';
 import postService from '@/services/postService';
+import socialComposerService from '@/services/socialComposerService';
 import userService from '@/services/userService';
 import { emitNotificationsChanged } from '@/services/notificationService';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
@@ -33,6 +33,11 @@ import {
   extractHashtagNamesFromText,
 } from '@/utils/socialText';
 import { SocialTextSpans } from '@/components/RichPostText';
+import ComposerEmojiPicker from '@/components/composer/ComposerEmojiPicker';
+import {
+  normalizeCodeFileName,
+  sanitizeCodeFileNameInput,
+} from '@/lib/codePostMeta';
 
 const FALLBACK_AVATAR =
   'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150';
@@ -63,43 +68,30 @@ const LANGUAGES = [
   { value: 'sql',        label: 'SQL',    ext: 'sql',    color: 'text-green-300'  },
 ];
 
+const MAX_CHARS = 2000;
+const DRAFT_KEY = 'vh:composer-draft';
+
+const POST_TYPE_PLACEHOLDERS = {
+  text: 'Share an idea, ask the class, start a thread…',
+  image: 'Describe your photo or album before you attach media…',
+  video: 'What is this video about? Add context for viewers…',
+  code: 'Add a caption or describe your code… (optional)',
+  question: 'Ask a clear question — classmates and teachers can help…',
+  update: 'Share a campus update, milestone, or announcement…',
+};
+
 const POST_TYPES = [
-  {
-    value: 'text', label: 'Text', Icon: FileText,
-    active: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/50 dark:text-amber-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
-  {
-    value: 'image', label: 'Image', Icon: Image,
-    active: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800/50 dark:bg-sky-950/50 dark:text-sky-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
-  {
-    value: 'video', label: 'Video', Icon: Video,
-    active: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/50 dark:text-emerald-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
-  {
-    value: 'code', label: 'Code', Icon: Code2,
-    active: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800/50 dark:bg-violet-950/50 dark:text-violet-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
-  {
-    value: 'question', label: 'Q&A', Icon: HelpCircle,
-    active: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/50 dark:bg-rose-950/50 dark:text-rose-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
-  {
-    value: 'update', label: 'Update', Icon: Megaphone,
-    active: 'border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800/50 dark:bg-indigo-950/50 dark:text-indigo-200',
-    idle: 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground',
-  },
+  { value: 'text', label: 'Text', Icon: FileText },
+  { value: 'image', label: 'Image', Icon: Image },
+  { value: 'video', label: 'Video', Icon: Video },
+  { value: 'code', label: 'Code', Icon: Code2 },
+  { value: 'question', label: 'Q&A', Icon: HelpCircle },
+  { value: 'update', label: 'Update', Icon: Megaphone },
 ];
 
 const VISIBILITY_OPTIONS = [
-  { value: 'public', label: 'Public', Icon: Globe },
-  { value: 'college_only', label: 'College', Icon: Building2 },
-  { value: 'private', label: 'Private', Icon: Lock },
+  { value: 'public', label: 'Public', Icon: Globe, hint: 'Visible to everyone on the platform' },
+  { value: 'private', label: 'Private', Icon: Lock, hint: 'Only you can see this post' },
 ];
 
 function mentionTokenFromUser(u) {
@@ -126,13 +118,11 @@ const CreatePost = ({ onPostCreated }) => {
   const { user } = useAuth();
   const [postText, setPostText] = useState('');
   const [cursor, setCursor] = useState(0);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [hashtags, setHashtags] = useState([]);
-  const [hashtagInput, setHashtagInput] = useState('');
   const [postType, setPostType] = useState('text');
   const [visibility, setVisibility] = useState('public');
   const [codeLanguage, setCodeLanguage] = useState('javascript');
+  const [codeFileName, setCodeFileName] = useState('');
   const [codeEditorText, setCodeEditorText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -141,8 +131,11 @@ const CreatePost = ({ onPostCreated }) => {
   const [mentionHighlight, setMentionHighlight] = useState(0);
   const [mentionedUserIds, setMentionedUserIds] = useState([]);
   const [trendingHashtags, setTrendingHashtags] = useState([]);
+  const [hashtagSuggestions, setHashtagSuggestions] = useState([]);
+  const [hashtagLoading, setHashtagLoading] = useState(false);
   const [hashtagHighlight, setHashtagHighlight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
 
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -160,10 +153,33 @@ const CreatePost = ({ onPostCreated }) => {
 
   const hashtagFiltered = useMemo(() => {
     if (!hashtagCtx) return [];
-    const pool = trendingHashtags.length > 0 ? trendingHashtags : FALLBACK_HASHTAGS;
     const q = hashtagCtx.query.toLowerCase();
-    return pool.filter(t => q.length === 0 ? true : t.toLowerCase().startsWith(q)).slice(0, 20);
-  }, [hashtagCtx, trendingHashtags]);
+
+    const fromApi = hashtagSuggestions.map(x =>
+      typeof x === 'string' ? { tag: x, count: 0 } : x,
+    );
+
+    const popularSource = trendingHashtags.length > 0 ? trendingHashtags : FALLBACK_HASHTAGS;
+    const fromPopular = popularSource.map(tag => ({
+      tag: typeof tag === 'string' ? tag : tag.tag || tag.name || '',
+      count: typeof tag === 'object' && tag?.count ? tag.count : 0,
+    }));
+
+    const merged = new Map();
+    [...fromApi, ...fromPopular].forEach(item => {
+      const name = String(item.tag || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (merged.has(key)) return;
+      if (!q || name.toLowerCase().includes(q)) {
+        merged.set(key, { tag: name, count: item.count || 0 });
+      }
+    });
+
+    return [...merged.values()]
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+      .slice(0, 20);
+  }, [hashtagCtx, hashtagSuggestions, trendingHashtags]);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +209,28 @@ const CreatePost = ({ onPostCreated }) => {
   }, []);
 
   const debouncedMentionSearch = useDebouncedCallback(runMentionSearch, 260);
+
+  const debouncedHashtagSearch = useDebouncedCallback(async (query) => {
+    setHashtagLoading(true);
+    try {
+      const results = await socialComposerService.searchHashtags(query, 20);
+      setHashtagSuggestions(results);
+    } catch {
+      setHashtagSuggestions([]);
+    } finally {
+      setHashtagLoading(false);
+    }
+  }, 220);
+
+  useEffect(() => {
+    if (activeAutocomplete.kind !== 'hashtag' || !hashtagCtx) {
+      setHashtagSuggestions([]);
+      setHashtagLoading(false);
+      return;
+    }
+    setHashtagHighlight(0);
+    debouncedHashtagSearch(hashtagCtx.query);
+  }, [activeAutocomplete.kind, hashtagCtx?.start, hashtagCtx?.query, debouncedHashtagSearch]);
 
   useEffect(() => {
     if (getActiveComposerAutocomplete(postText, cursor).kind !== 'mention') {
@@ -245,15 +283,53 @@ const CreatePost = ({ onPostCreated }) => {
 
   const removeFile = (index) => setSelectedFiles(prev => prev.filter((_, i) => i !== index));
 
-  const addHashtag = () => {
-    const tag = hashtagInput.trim().replace('#', '');
-    if (tag && !hashtags.includes(tag) && hashtags.length < 10) {
-      setHashtags(prev => [...prev, tag]);
-      setHashtagInput('');
-    }
-  };
+  const openMediaPicker = useCallback((mode) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept = mode === 'image'
+      ? 'image/*'
+      : mode === 'video'
+        ? 'video/*'
+        : 'image/*,video/*,.pdf,.doc,.docx,.txt,.js,.py,.java,.cpp,.c,.html,.css,.json';
+    input.click();
+  }, []);
 
-  const removeHashtag = (tagToRemove) => setHashtags(prev => prev.filter(tag => tag !== tagToRemove));
+  const selectPostType = useCallback((value) => {
+    setPostType(value);
+    if (value === 'image' || value === 'video') openMediaPicker(value);
+  }, [openMediaPicker]);
+
+  const startHashtag = useCallback(() => {
+    const ta = textareaRef.current;
+    const start = ta?.selectionStart ?? cursor;
+    const end = ta?.selectionEnd ?? start;
+
+    if (getHashtagContext(postText, start)) {
+      ta?.focus();
+      setInputFocused(true);
+      return;
+    }
+
+    const before = postText.slice(0, start);
+    const after = postText.slice(end);
+    const needsSpace = before.length > 0 && !/[\s\n]$/.test(before);
+    const insert = `${needsSpace ? ' ' : ''}#`;
+    const newText = before + insert + after;
+    if (newText.length > MAX_CHARS) return;
+
+    setPostText(newText);
+    const pos = start + insert.length;
+    requestAnimationFrame(() => {
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+        setCursor(pos);
+        setInputFocused(true);
+      } else {
+        setCursor(pos);
+      }
+    });
+  }, [postText, cursor]);
 
   const applyMention = useCallback((u) => {
     const ctx = getMentionContext(postText, cursor);
@@ -289,6 +365,25 @@ const CreatePost = ({ onPostCreated }) => {
     });
   }, [postText, cursor]);
 
+  const insertEmoji = useCallback((emoji) => {
+    const ta = textareaRef.current;
+    const start = ta?.selectionStart ?? cursor;
+    const end = ta?.selectionEnd ?? start;
+    const newText = postText.slice(0, start) + emoji + postText.slice(end);
+    if (newText.length > MAX_CHARS) return;
+    setPostText(newText);
+    const pos = start + emoji.length;
+    requestAnimationFrame(() => {
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+        setCursor(pos);
+      } else {
+        setCursor(pos);
+      }
+    });
+  }, [postText, cursor]);
+
   const handleTextareaChange = (e) => {
     setPostText(e.target.value);
     setCursor(e.target.selectionStart ?? e.target.value.length);
@@ -312,11 +407,11 @@ const CreatePost = ({ onPostCreated }) => {
     } else if (active.kind === 'hashtag') {
       const h = getHashtagContext(val, pos);
       const list = hashtagFiltered;
-      if (h && h.query.length >= 1 && list.length > 0) {
+      if (h && list.length > 0) {
         if (e.key === 'ArrowDown') { e.preventDefault(); setHashtagHighlight(i => Math.min(i + 1, list.length - 1)); return; }
         if (e.key === 'ArrowUp') { e.preventDefault(); setHashtagHighlight(i => Math.max(i - 1, 0)); return; }
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const pick = list[hashtagHighlight]; if (pick) applyHashtag(pick); return; }
-        if (e.key === 'Tab') { e.preventDefault(); applyHashtag(list[hashtagHighlight]); return; }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const pick = list[hashtagHighlight]; if (pick) applyHashtag(pick.tag ?? pick); return; }
+        if (e.key === 'Tab') { e.preventDefault(); const pick = list[hashtagHighlight]; if (pick) applyHashtag(pick.tag ?? pick); return; }
       }
     }
   };
@@ -347,22 +442,24 @@ const CreatePost = ({ onPostCreated }) => {
       }
 
       const fromBody = extractHashtagNamesFromText(postText);
-      const mergedTags = [...new Set([...hashtags.filter(Boolean), ...fromBody])];
       const postData = {
         content: submitContent,
         type: effectiveType,
         visibility,
-        hashtags: mergedTags.length > 0 ? mergedTags : undefined,
+        hashtags: fromBody.length > 0 ? fromBody : undefined,
         media: hasMedia ? selectedFiles : undefined,
         code_language: codeLanguage || undefined,
+        code_file_name: hasCode
+          ? normalizeCodeFileName(codeFileName, codeLanguage)
+          : undefined,
         mentioned_users: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
       };
       const newPost = await postService.createPost(postData);
       onPostCreated(newPost);
       emitNotificationsChanged();
-      setPostText(''); setSelectedFiles([]); setHashtags([]); setHashtagInput('');
+      setPostText(''); setSelectedFiles([]);
       setPostType('text'); setVisibility('public'); setCodeLanguage('javascript');
-      setCodeEditorText(''); setMentionedUserIds([]); setError('');
+      setCodeFileName(''); setCodeEditorText(''); setMentionedUserIds([]); setError('');
     } catch (err) {
       console.error('Error creating post:', err);
       setError(err.response?.data?.message || err.message || 'Failed to create post');
@@ -386,536 +483,468 @@ const CreatePost = ({ onPostCreated }) => {
       (mentionCtx.query.length >= 1 && !mentionLoading && mentionSuggestions.length === 0));
 
   const showHashtagPanel =
-    activeAutocomplete.kind === 'hashtag' &&
-    hashtagCtx &&
-    (hashtagFiltered.length > 0 || (hashtagCtx.query.length >= 1 && hashtagFiltered.length === 0));
+    activeAutocomplete.kind === 'hashtag' && hashtagCtx != null;
 
-  const charPct = postText.length / 500;
-  const circumference = 2 * Math.PI * 9;
+  const handleSaveDraft = () => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        postText,
+        postType,
+        visibility,
+        codeEditorText,
+        codeLanguage,
+        codeFileName,
+      }));
+    } catch { /* ignore */ }
+  };
+
+  const codeFilePreview = normalizeCodeFileName(codeFileName, codeLanguage);
+
+  const canSubmit =
+    (postText.trim() || selectedFiles.length > 0 || (postType === 'code' && codeEditorText.trim())) &&
+    postText.length <= MAX_CHARS &&
+    !loading;
+
+  const charsLeft = MAX_CHARS - postText.length;
+  const charClass =
+    postText.length > MAX_CHARS
+      ? 'feed-composer__chars feed-composer__chars--over'
+      : charsLeft <= 100
+        ? 'feed-composer__chars feed-composer__chars--warn'
+        : 'feed-composer__chars';
 
   return (
-    <div data-mention-root className="composer-card relative">
-
-      {/* ── Error banner ──────────────────────────────────────── */}
-      {error ? (
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
-          <X className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button type="button" onClick={() => setError('')} className="opacity-60 hover:opacity-100 transition-opacity">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ) : null}
-
-      {/* ── Author + visibility row ───────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <UserAvatar
-            src={avatarSrc}
-            alt={composerName}
-            size="md"
-            status={PRESENCE_STATUS.ONLINE}
-            fallbackSrc={FALLBACK_AVATAR}
-            className="shrink-0"
-          />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-[14px] font-bold tracking-tight text-foreground leading-tight truncate">{composerName}</span>
-              <PresenceLabel status={PRESENCE_STATUS.ONLINE} />
+    <div className="feed-composer-shell">
+      <div className="feed-composer-shell__aurora" aria-hidden />
+      <article
+        data-mention-root
+        className={cn('feed-composer', (inputFocused || showMentionPanel || showHashtagPanel) && 'feed-composer--focused')}
+        aria-label="Create post"
+      >
+        <div className="feed-composer__inner">
+          {error ? (
+            <div className="feed-composer__error">
+              <X className="h-4 w-4 shrink-0" />
+              <span className="flex-1">{error}</span>
+              <button type="button" onClick={() => setError('')} aria-label="Dismiss error">
+                <X className="h-3.5 w-3.5 opacity-60" />
+              </button>
             </div>
-            <p className="text-[11.5px] font-medium text-muted-foreground/80 leading-tight mt-1 tracking-tight">Posting to your feed</p>
-          </div>
-        </div>
+          ) : null}
 
-        {/* Visibility segmented control */}
-        <div className="flex shrink-0 items-center rounded-full border border-border/60 bg-muted/30 p-0.5">
-          {VISIBILITY_OPTIONS.map(({ value, label, Icon }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setVisibility(value)}
-              title={label}
+          <header className="feed-composer__header">
+            <div className="feed-composer__author">
+              <div className="feed-composer__avatar-wrap">
+                <UserAvatar
+                  src={avatarSrc}
+                  alt={composerName}
+                  size="md"
+                  showStatus={false}
+                  fallbackSrc={FALLBACK_AVATAR}
+                />
+                <span className="feed-composer__online" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <div className="feed-composer__name-row">
+                  <p className="feed-composer__name">{composerName}</p>
+                  <span className="feed-composer__available">
+                    <span className="feed-composer__available-dot" aria-hidden />
+                    Available
+                  </span>
+                </div>
+                <p className="feed-composer__subtitle">
+                  <Sparkles className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                  Composing a new post
+                </p>
+              </div>
+            </div>
+
+            <div className="feed-composer__audience" role="tablist" aria-label="Post audience">
+              {VISIBILITY_OPTIONS.map(({ value, label, Icon, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={visibility === value}
+                  title={hint}
+                  onClick={() => setVisibility(value)}
+                  className={cn(
+                    'feed-composer__audience-tab',
+                    visibility === value && 'feed-composer__audience-tab--active',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <div className="relative">
+            <div
               className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-bold tracking-tight transition-all duration-150',
-                visibility === value
-                  ? 'bg-card text-foreground shadow-xs ring-1 ring-border/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                'feed-composer__field',
+                (inputFocused || showMentionPanel || showHashtagPanel) && 'feed-composer__field--focused',
               )}
             >
-              <Icon className="h-3 w-3 shrink-0" strokeWidth={2.25} />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Textarea + autocomplete ───────────────────────────── */}
-      <div className="relative">
-        <div className={cn(
-          'relative overflow-hidden rounded-xl border border-border/60 bg-muted/20',
-          'transition-all duration-200',
-          'focus-within:border-primary/40 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/10',
-        )}>
-          {/* Syntax highlight mirror */}
-          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-xl" aria-hidden>
-            <div className="px-4 py-3.5">
               <div
-                ref={mirrorInnerRef}
-                className="text-left text-[15px] leading-relaxed"
-                style={{ transform: `translateY(-${scrollTop}px)` }}
-              >
-                <div className="whitespace-pre-wrap break-words">
-                  <SocialTextSpans text={postText} />
+                className={cn('feed-composer__field-wash', `feed-composer__field-wash--${postType}`)}
+                aria-hidden
+              />
+              <div className="feed-composer__mirror" aria-hidden>
+                <div
+                  ref={mirrorInnerRef}
+                  style={{ transform: `translateY(-${scrollTop}px)` }}
+                >
+                  <div className="whitespace-pre-wrap break-words text-[0.9375rem] leading-[1.55] text-foreground">
+                    <SocialTextSpans text={postText} />
+                  </div>
                 </div>
               </div>
+              <textarea
+                ref={textareaRef}
+                value={postText}
+                onChange={handleTextareaChange}
+                onSelect={e => setCursor(e.target.selectionStart ?? 0)}
+                onClick={e => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onKeyUp={e => setCursor(e.currentTarget.selectionStart ?? 0)}
+                onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                placeholder={POST_TYPE_PLACEHOLDERS[postType] || POST_TYPE_PLACEHOLDERS.text}
+                rows={4}
+                maxLength={MAX_CHARS + 100}
+                spellCheck
+                className="feed-composer__textarea"
+                aria-label="Post content"
+              />
+              <div className="feed-composer__field-footer">
+                <p className="feed-composer__hint">
+                  Type <kbd>@</kbd> to mention, <kbd>#</kbd> for topics
+                </p>
+                <span className={charClass} aria-live="polite">
+                  {postText.length} / {MAX_CHARS}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <textarea
-            ref={textareaRef}
-            value={postText}
-            onChange={handleTextareaChange}
-            onSelect={e => setCursor(e.target.selectionStart ?? 0)}
-            onClick={e => setCursor(e.currentTarget.selectionStart ?? 0)}
-            onKeyUp={e => setCursor(e.currentTarget.selectionStart ?? 0)}
-            onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              postType === 'code'
-                ? 'Add a caption or describe your code… (optional)'
-                : 'What\'s on your mind? @mention people · #hashtag topics'
-            }
-            rows={postType === 'code' ? 2 : 3}
-            maxLength={500}
-            spellCheck
-            className={cn(
-              'relative z-10 min-h-[60px] w-full max-h-[320px] resize-none overflow-y-auto border-0 bg-transparent px-4 py-3.5',
-              '[scrollbar-gutter:stable]',
-              'text-[15px] leading-relaxed text-transparent caret-foreground',
-              'placeholder:text-muted-foreground/55 placeholder:text-[14px]',
-              'focus:outline-none focus:ring-0',
-            )}
-            aria-label="Post content"
-          />
-        </div>
-
-        {/* Mention autocomplete */}
-        {showMentionPanel && mentionCtx ? (
-          <div
-            className={cn(
-              'absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-lg',
-              'animate-fade-in',
-            )}
-            role="listbox"
-            aria-label="Mention suggestions"
-          >
-            {mentionCtx.query.length < 1 ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
-                <AtSign className="h-4 w-4 shrink-0 opacity-70" />
-                Type a name after @ to search people
-              </div>
-            ) : mentionLoading ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Searching…
-              </div>
-            ) : mentionSuggestions.length === 0 ? (
-              <div className="px-3 py-2.5 text-sm text-muted-foreground">No people found</div>
-            ) : (
-              <ul ref={mentionListRef} className="max-h-52 overflow-y-auto py-1">
-                {mentionSuggestions.map((u, idx) => {
-                  const active = idx === mentionHighlight;
-                  const name = displayName(u);
-                  const sub = u.user_type || u.role ? String(u.user_type || u.role).replace('_', ' ') : '';
-                  return (
-                    <li key={String(u.id)}>
-                      <button
-                        type="button"
-                        data-idx={idx}
-                        role="option"
-                        aria-selected={active}
-                        className={cn(
-                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors',
-                          active ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-muted/80',
-                        )}
-                        onMouseEnter={() => setMentionHighlight(idx)}
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => applyMention(u)}
-                      >
-                        <img
-                          src={userAvatarSrc(u)}
-                          alt=""
-                          className="h-9 w-9 shrink-0 rounded-full object-cover"
-                          onError={e => { e.currentTarget.src = FALLBACK_AVATAR; }}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{name}</span>
-                          {sub ? (
-                            <span className="block truncate text-xs capitalize text-muted-foreground">{sub}</span>
-                          ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        ) : null}
-
-        {/* Hashtag autocomplete */}
-        {showHashtagPanel && hashtagCtx ? (
-          <div
-            className={cn(
-              'absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-lg',
-              'animate-fade-in',
-            )}
-            role="listbox"
-            aria-label="Hashtag suggestions"
-          >
-            {hashtagCtx.query.length === 0 && hashtagFiltered.length > 0 ? (
-              <div className="border-b border-border/60 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Trending &amp; matching
+            {showMentionPanel && mentionCtx ? (
+              <div
+                className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-lg animate-fade-in"
+                role="listbox"
+                aria-label="Mention suggestions"
+              >
+                {mentionCtx.query.length < 1 ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
+                    <AtSign className="h-4 w-4 shrink-0 opacity-70" />
+                    Type a name after @ to search people
+                  </div>
+                ) : mentionLoading ? (
+                  <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching…
+                  </div>
+                ) : mentionSuggestions.length === 0 ? (
+                  <div className="px-3 py-2.5 text-sm text-muted-foreground">No people found</div>
+                ) : (
+                  <ul ref={mentionListRef} className="max-h-52 overflow-y-auto py-1">
+                    {mentionSuggestions.map((u, idx) => {
+                      const active = idx === mentionHighlight;
+                      const name = displayName(u);
+                      const sub = u.user_type || u.role ? String(u.user_type || u.role).replace('_', ' ') : '';
+                      return (
+                        <li key={String(u.id)}>
+                          <button
+                            type="button"
+                            data-idx={idx}
+                            role="option"
+                            aria-selected={active}
+                            className={cn(
+                              'flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors',
+                              active ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-muted/80',
+                            )}
+                            onMouseEnter={() => setMentionHighlight(idx)}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => applyMention(u)}
+                          >
+                            <img
+                              src={userAvatarSrc(u)}
+                              alt=""
+                              className="h-9 w-9 shrink-0 rounded-full object-cover"
+                              onError={e => { e.currentTarget.src = FALLBACK_AVATAR; }}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">{name}</span>
+                              {sub ? (
+                                <span className="block truncate text-xs capitalize text-muted-foreground">{sub}</span>
+                              ) : null}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             ) : null}
-            {hashtagFiltered.length === 0 && hashtagCtx.query.length >= 1 ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
-                <Hash className="h-4 w-4 shrink-0 opacity-70" />
-                No hashtags match &ldquo;{hashtagCtx.query}&rdquo;
+
+            {showHashtagPanel && hashtagCtx ? (
+              <div
+                className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-lg animate-fade-in"
+                role="listbox"
+                aria-label="Hashtag suggestions"
+              >
+                {hashtagCtx.query.length === 0 && hashtagFiltered.length > 0 ? (
+                  <div className="border-b border-border/60 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Trending &amp; matching
+                  </div>
+                ) : null}
+                {hashtagLoading ? (
+                  <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching tags…
+                  </div>
+                ) : hashtagFiltered.length === 0 && hashtagCtx.query.length >= 1 ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
+                    <Hash className="h-4 w-4 shrink-0 opacity-70" />
+                    No hashtags match &ldquo;{hashtagCtx.query}&rdquo;
+                  </div>
+                ) : hashtagFiltered.length === 0 ? (
+                  <div className="px-3 py-2.5 text-sm text-muted-foreground">
+                    Type to search tags
+                  </div>
+                ) : (
+                  <ul ref={hashtagListRef} className="max-h-52 overflow-y-auto py-1">
+                    {hashtagFiltered.map((item, idx) => {
+                      const tag = item.tag ?? item;
+                      const active = idx === hashtagHighlight;
+                      return (
+                        <li key={String(tag)}>
+                          <button
+                            type="button"
+                            data-hidx={idx}
+                            role="option"
+                            aria-selected={active}
+                            className={cn(
+                              'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold transition-colors',
+                              active ? 'bg-primary/10 text-foreground' : 'text-foreground/90 hover:bg-muted/80',
+                            )}
+                            onMouseEnter={() => setHashtagHighlight(idx)}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => applyHashtag(tag)}
+                          >
+                            <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                            <span><span className="text-foreground/80">#</span>{tag}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
-            ) : hashtagFiltered.length === 0 ? (
-              <div className="px-3 py-2.5 text-sm text-muted-foreground">
-                Type letters after # to search tags
-              </div>
-            ) : (
-              <ul ref={hashtagListRef} className="max-h-52 overflow-y-auto py-1">
-                {hashtagFiltered.map((tag, idx) => {
-                  const active = idx === hashtagHighlight;
-                  return (
-                    <li key={tag}>
-                      <button
-                        type="button"
-                        data-hidx={idx}
-                        role="option"
-                        aria-selected={active}
-                        className={cn(
-                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold transition-colors',
-                          active ? 'bg-primary/10 text-foreground' : 'text-foreground/90 hover:bg-muted/80',
-                        )}
-                        onMouseEnter={() => setHashtagHighlight(idx)}
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => applyHashtag(tag)}
-                      >
-                        <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                        <span><span className="text-foreground/80">#</span>{tag}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            ) : null}
           </div>
-        ) : null}
-      </div>
 
-      {/* ── Post type chips ───────────────────────────────────── */}
-      <div className="mt-3 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-        {POST_TYPES.map(({ value, label, Icon, active: activeClass, idle }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setPostType(value)}
-            className={cn(
-              'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-150',
-              postType === value ? activeClass : idle,
-            )}
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Code snippet block (code type only) ─────────────────── */}
-      {postType === 'code' ? (
-        <div className="mt-3 overflow-hidden rounded-xl border border-violet-400/30 bg-gray-950 shadow-lg">
-
-          {/* Language selector strip */}
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-white/[0.06] bg-[#161b22] px-3 py-2 scrollbar-hide">
-            <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-widest text-gray-600">Lang</span>
-            {LANGUAGES.map(lang => (
+          <div className="feed-composer__types" role="toolbar" aria-label="Post format and tools">
+            <ComposerEmojiPicker onSelect={insertEmoji}>
               <button
-                key={lang.value}
                 type="button"
-                onClick={() => setCodeLanguage(lang.value)}
+                className="feed-composer__type feed-composer__type--action"
+                aria-label="Emoji"
+                onClick={() => textareaRef.current?.focus()}
+              >
+                <Smile className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                Emoji
+              </button>
+            </ComposerEmojiPicker>
+
+            {POST_TYPES.slice(0, 3).map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={postType === value}
+                onClick={() => selectPostType(value)}
                 className={cn(
-                  'shrink-0 rounded-md px-2.5 py-1 text-[11px] font-mono font-semibold transition-all duration-100',
-                  codeLanguage === lang.value
-                    ? `bg-violet-500/20 ${lang.color} ring-1 ring-violet-500/40`
-                    : 'text-gray-500 hover:bg-white/5 hover:text-gray-300',
+                  'feed-composer__type',
+                  postType === value && 'feed-composer__type--active',
                 )}
               >
-                {lang.label}
+                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                {label}
               </button>
             ))}
-          </div>
 
-          {/* macOS editor title bar */}
-          <div className="flex items-center gap-3 border-b border-white/[0.06] bg-[#1c2128] px-4 py-2">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-            </span>
-            <span className="font-mono text-[11px] text-gray-500">
-              {`snippet.${LANGUAGES.find(l => l.value === codeLanguage)?.ext ?? 'txt'}`}
-            </span>
-            <span className={cn(
-              'ml-auto font-mono text-[11px] font-semibold',
-              LANGUAGES.find(l => l.value === codeLanguage)?.color ?? 'text-violet-300',
-            )}>
-              {LANGUAGES.find(l => l.value === codeLanguage)?.label ?? 'Code'}
-            </span>
-          </div>
+            <button
+              type="button"
+              className="feed-composer__type feed-composer__type--action"
+              aria-label="Tag"
+              onClick={startHashtag}
+            >
+              <Hash className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              Tag
+            </button>
 
-          {/* Code textarea */}
-          <textarea
-            ref={codeEditorRef}
-            value={codeEditorText}
-            onChange={e => setCodeEditorText(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Tab') {
-                e.preventDefault();
-                const ta = e.currentTarget;
-                const start = ta.selectionStart;
-                const end = ta.selectionEnd;
-                const next = codeEditorText.slice(0, start) + '  ' + codeEditorText.slice(end);
-                setCodeEditorText(next);
-                requestAnimationFrame(() => {
-                  ta.selectionStart = ta.selectionEnd = start + 2;
-                });
-              }
-            }}
-            placeholder={`// Write your ${LANGUAGES.find(l => l.value === codeLanguage)?.label ?? 'code'} here…`}
-            rows={6}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            className={cn(
-              'min-h-[140px] w-full max-h-[360px] resize-none overflow-y-auto border-0 bg-[#0d1117] px-4 pb-4 pt-3.5',
-              'font-mono text-[13px] leading-relaxed text-gray-100 caret-violet-400',
-              'placeholder:font-mono placeholder:text-[13px] placeholder:text-gray-700',
-              'focus:outline-none focus:ring-0',
-            )}
-            aria-label="Code content"
-          />
-        </div>
-      ) : null}
-
-      {/* ── File previews ─────────────────────────────────────── */}
-      {selectedFiles.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {selectedFiles.map((file, index) => {
-            const isVideo = file.type?.startsWith('video/');
-            return (
-              <div
-                key={`${file.name}-${index}`}
-                className="group flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+            {POST_TYPES.slice(3).map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={postType === value}
+                onClick={() => selectPostType(value)}
+                className={cn(
+                  'feed-composer__type',
+                  postType === value && 'feed-composer__type--active',
+                )}
               >
-                <span className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                  isVideo
-                    ? 'bg-emerald-100 dark:bg-emerald-950/60'
-                    : file.type?.startsWith('image/')
-                      ? 'bg-sky-100 dark:bg-sky-950/60'
-                      : 'bg-amber-100 dark:bg-amber-950/60',
-                )}>
-                  {isVideo
-                    ? <Video className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    : file.type?.startsWith('image/')
-                      ? <Image className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      : <FileText className="h-4 w-4 text-amber-700 dark:text-amber-400" />
-                  }
-                </span>
-                <div className="min-w-0">
-                  <p className="max-w-[140px] truncate text-xs font-medium text-foreground">{file.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{formatFileSize(file.size)}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeFile(index)}
-                  aria-label="Remove file"
-                  className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {/* ── Hashtag tag strip ─────────────────────────────────── */}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {hashtags.map(tag => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/15"
-          >
-            #{tag}
-            <button
-              type="button"
-              onClick={() => removeHashtag(tag)}
-              aria-label={`Remove #${tag}`}
-              className="transition-colors hover:text-destructive ml-0.5"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-        <div className="flex items-center gap-1 rounded-full border border-border/50 bg-transparent px-2.5 py-1 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-150">
-          <Hash className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-          <input
-            type="text"
-            value={hashtagInput}
-            onChange={e => setHashtagInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addHashtag(); } }}
-            placeholder="Add tag…"
-            className="w-20 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-          />
-          {hashtagInput.trim() ? (
-            <button
-              type="button"
-              onClick={addHashtag}
-              disabled={hashtags.length >= 10}
-              className="ml-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
-            >
-              +
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {/* ── Action footer ─────────────────────────────────────── */}
-      <div className="mt-4 border-t border-border/50 pt-3.5">
-        <div className="flex items-center justify-between gap-2">
-
-          {/* Left: action buttons */}
-          <div className="flex min-w-0 flex-1 items-center gap-0 overflow-x-auto scrollbar-hide">
-            {/* Consolidated media button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-muted-foreground transition-all duration-150 hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-950/30 dark:hover:text-sky-400"
-            >
-              <Paperclip className="h-4 w-4 shrink-0" />
-              <span className="hidden text-sm font-medium sm:inline">Media</span>
-            </button>
+                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                {label}
+              </button>
+            ))}
 
             <button
               type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              aria-expanded={showEmojiPicker}
-              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-muted-foreground transition-all duration-150 hover:bg-yellow-50 hover:text-yellow-700 dark:hover:bg-yellow-950/30 dark:hover:text-yellow-400"
+              className="feed-composer__type feed-composer__type--action"
+              aria-label="Location"
             >
-              <Smile className="h-4 w-4 shrink-0" />
-              <span className="hidden text-sm font-medium sm:inline">Emoji</span>
-            </button>
-
-            {/* Insert # shortcut */}
-            <button
-              type="button"
-              onClick={() => {
-                const ta = textareaRef.current;
-                if (!ta) return;
-                const pos = ta.selectionStart ?? ta.value.length;
-                const newText = postText.slice(0, pos) + '#' + postText.slice(pos);
-                setPostText(newText);
-                const next = pos + 1;
-                setCursor(next);
-                requestAnimationFrame(() => {
-                  ta.focus();
-                  ta.setSelectionRange(next, next);
-                });
-              }}
-              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-muted-foreground transition-all duration-150 hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-400"
-            >
-              <Hash className="h-4 w-4 shrink-0" />
-              <span className="hidden text-sm font-medium sm:inline">Tag</span>
-            </button>
-
-            <span className="mx-1 hidden h-4 w-px bg-border/60 sm:inline-block" />
-
-            <button
-              type="button"
-              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground"
-            >
-              <MapPin className="h-4 w-4 shrink-0" />
-              <span className="hidden text-sm sm:inline">Location</span>
+              <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              Location
             </button>
           </div>
 
-          {/* Right: circular char counter + post button */}
-          <div className="flex shrink-0 items-center gap-2.5">
-            {postText ? (
-              <div className="relative flex h-7 w-7 items-center justify-center" title={`${postText.length}/500 characters`}>
-                <svg className="-rotate-90 h-7 w-7" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" className="text-muted/30" />
-                  <circle
-                    cx="12" cy="12" r="9"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={circumference * (1 - charPct)}
-                    strokeLinecap="round"
+          {postType === 'code' ? (
+            <div className="mt-3 overflow-hidden rounded-xl border border-violet-400/30 bg-gray-950 shadow-lg">
+              <div className="flex items-center gap-1 overflow-x-auto border-b border-white/[0.06] bg-[#161b22] px-3 py-2 scrollbar-hide">
+                <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-widest text-gray-600">Lang</span>
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang.value}
+                    type="button"
+                    onClick={() => setCodeLanguage(lang.value)}
                     className={cn(
-                      'transition-all duration-150',
-                      postText.length > 480 ? 'text-destructive' : postText.length > 400 ? 'text-amber-500' : 'text-primary',
+                      'shrink-0 rounded-md px-2.5 py-1 text-[11px] font-mono font-semibold transition-all duration-100',
+                      codeLanguage === lang.value
+                        ? `bg-violet-500/20 ${lang.color} ring-1 ring-violet-500/40`
+                        : 'text-gray-500 hover:bg-white/5 hover:text-gray-300',
                     )}
-                  />
-                </svg>
-                {postText.length > 400 ? (
-                  <span className={cn(
-                    'absolute text-[8px] font-bold tabular-nums',
-                    postText.length > 480 ? 'text-destructive' : 'text-muted-foreground',
-                  )}>
-                    {500 - postText.length}
-                  </span>
-                ) : null}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
               </div>
-            ) : null}
+              <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] bg-[#1c2128] px-4 py-2.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                </span>
+                <Code2 className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
+                <label className="sr-only" htmlFor="code-file-name">Code file name</label>
+                <input
+                  id="code-file-name"
+                  type="text"
+                  value={codeFileName}
+                  onChange={(e) => setCodeFileName(sanitizeCodeFileNameInput(e.target.value))}
+                  placeholder="File name (e.g. index, app, StudentService)"
+                  spellCheck={false}
+                  className="min-w-[10rem] flex-1 rounded-md border border-white/10 bg-[#0d1117]/80 px-2.5 py-1 font-mono text-[11px] text-gray-200 placeholder:text-gray-600 focus:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                />
+                <span className="shrink-0 font-mono text-[11px] text-gray-500">
+                  → {codeFilePreview}
+                </span>
+              </div>
+              <textarea
+                ref={codeEditorRef}
+                value={codeEditorText}
+                onChange={e => setCodeEditorText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const ta = e.currentTarget;
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    const next = codeEditorText.slice(0, start) + '  ' + codeEditorText.slice(end);
+                    setCodeEditorText(next);
+                    requestAnimationFrame(() => {
+                      ta.selectionStart = ta.selectionEnd = start + 2;
+                    });
+                  }
+                }}
+                placeholder={`// Write your ${LANGUAGES.find(l => l.value === codeLanguage)?.label ?? 'code'} here…`}
+                rows={6}
+                spellCheck={false}
+                className="min-h-[140px] w-full max-h-[360px] resize-none overflow-y-auto border-0 bg-[#0d1117] px-4 pb-4 pt-3.5 font-mono text-[13px] leading-relaxed text-gray-100 caret-violet-400 placeholder:text-gray-700 focus:outline-none"
+                aria-label="Code content"
+              />
+            </div>
+          ) : null}
 
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={(!postText.trim() && selectedFiles.length === 0) || loading}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-200',
-                (postText.trim() || selectedFiles.length > 0) && !loading
-                  ? 'btn-primary'
-                  : 'cursor-not-allowed bg-muted text-muted-foreground',
-              )}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Posting…</span>
-                </>
-              ) : 'Post'}
-            </button>
-          </div>
+          {selectedFiles.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100">
+                    {file.type?.startsWith('video/')
+                      ? <Video className="h-4 w-4 text-emerald-600" />
+                      : file.type?.startsWith('image/')
+                        ? <Image className="h-4 w-4 text-sky-600" />
+                        : <FileText className="h-4 w-4 text-amber-700" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="max-w-[140px] truncate text-xs font-medium">{file.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{formatFileSize(file.size)}</p>
+                  </div>
+                  <button type="button" onClick={() => removeFile(index)} aria-label="Remove file">
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="feed-composer__divider" role="separator" />
+
+          <footer className="feed-composer__footer">
+            <div className="feed-composer__actions feed-composer__actions--solo">
+              <button type="button" className="feed-composer__draft" onClick={handleSaveDraft}>
+                Save draft
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={cn(
+                  'feed-composer__post',
+                  canSubmit ? 'feed-composer__post--ready' : 'feed-composer__post--disabled',
+                )}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Posting…
+                  </>
+                ) : (
+                  <>
+                    Post
+                    <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+                  </>
+                )}
+              </button>
+            </div>
+          </footer>
         </div>
-      </div>
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.js,.py,.java,.cpp,.c,.html,.css,.json"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*,.pdf,.doc,.docx,.txt,.js,.py,.java,.cpp,.c,.html,.css,.json"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+      </article>
     </div>
   );
 };

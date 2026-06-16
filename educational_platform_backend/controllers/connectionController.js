@@ -38,6 +38,8 @@ function serializeConnectionRequest(row) {
         profile_picture: j.sender.profile_picture,
         user_type: j.sender.user_type,
         tenant_id: j.sender.tenant_id,
+        bio: j.sender.bio || null,
+        location: j.sender.location || null,
       }
     : null;
   const receiver = j.receiver
@@ -48,6 +50,8 @@ function serializeConnectionRequest(row) {
         profile_picture: j.receiver.profile_picture,
         user_type: j.receiver.user_type,
         tenant_id: j.receiver.tenant_id,
+        bio: j.receiver.bio || null,
+        location: j.receiver.location || null,
       }
     : null;
   return {
@@ -62,6 +66,35 @@ function serializeConnectionRequest(row) {
     sender,
     receiver,
   };
+}
+
+/** Attach full network profile fields to the relevant peer on each invitation row. */
+async function enrichConnectionRequests(viewerId, rows, peerField) {
+  const peers = rows.map((row) => row?.[peerField]).filter(Boolean);
+  if (!peers.length) {
+    return rows.map((row) => serializeConnectionRequest(row)).filter(Boolean);
+  }
+
+  const enrichedPeers = await enrichUsersForNetwork(viewerId, peers);
+  const enrichedById = new Map(enrichedPeers.map((u) => [String(u.id), u]));
+
+  return rows
+    .map((row) => {
+      const base = serializeConnectionRequest(row);
+      if (!base) return null;
+      const peer = base[peerField];
+      if (!peer) return base;
+
+      const enriched = enrichedById.get(String(peer.id));
+      if (!enriched) return base;
+
+      return {
+        ...base,
+        ...enriched,
+        [peerField]: { ...peer, ...enriched },
+      };
+    })
+    .filter(Boolean);
 }
 
 // Send a connection request
@@ -577,7 +610,7 @@ exports.getPendingRequests = async (req, res) => {
         {
           model: db.User,
           as: 'sender',
-          attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'user_type', 'tenant_id']
+          attributes: NETWORK_USER_ATTRS,
         }
       ],
       order: [['created_at', 'DESC']],
@@ -585,10 +618,12 @@ exports.getPendingRequests = async (req, res) => {
       limit: limitNum
     });
 
+    const requests = await enrichConnectionRequests(user_id, rows, 'sender');
+
     return res.status(200).json({
       status: true,
       data: {
-        requests: rows.map(serializeConnectionRequest).filter(Boolean),
+        requests,
         pagination: {
           total: count,
           page: pageNum,
@@ -631,7 +666,7 @@ exports.getSentRequests = async (req, res) => {
         {
           model: db.User,
           as: 'receiver',
-          attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'user_type', 'tenant_id']
+          attributes: NETWORK_USER_ATTRS,
         }
       ],
       order: [['created_at', 'DESC']],
@@ -639,10 +674,12 @@ exports.getSentRequests = async (req, res) => {
       limit: limitNum
     });
 
+    const requests = await enrichConnectionRequests(user_id, rows, 'receiver');
+
     return res.status(200).json({
       status: true,
       data: {
-        requests: rows.map(serializeConnectionRequest).filter(Boolean),
+        requests,
         pagination: {
           total: count,
           page: pageNum,
@@ -755,151 +792,18 @@ exports.getUserNetwork = async (req, res) => {
   }
 };
 
-// Get network suggestions (people you may know) — cross-college with mutual/skill scoring
+const { getNetworkSuggestions } = require('../services/networkRecommendationService');
+
+// Get network suggestions (people you may know) — relationship-aware scoring
 exports.getNetworkSuggestions = async (req, res) => {
   const user_id = req.user.id;
-  const { page = 1, limit = 10, user_type: userTypeFilter } = req.query;
 
   try {
-    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 10));
-    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
-
-    const involved = await db.Connection.findAll({
-      where: {
-        status: { [Op.in]: ['pending', 'accepted'] },
-        [Op.or]: [{ sender_id: user_id }, { receiver_id: user_id }],
-      },
-      attributes: ['sender_id', 'receiver_id'],
-    });
-
-    const excludeIds = new Set([String(user_id)]);
-    involved.forEach((c) => {
-      excludeIds.add(String(c.sender_id) === String(user_id) ? c.receiver_id : c.sender_id);
-    });
-
-    const blocks = await db.UserBlock.findAll({
-      where: {
-        [Op.or]: [{ blocker_id: user_id }, { blocked_user_id: user_id }],
-      },
-      attributes: ['blocker_id', 'blocked_user_id'],
-    });
-    blocks.forEach((b) => {
-      excludeIds.add(String(b.blocker_id) === String(user_id) ? b.blocked_user_id : b.blocker_id);
-    });
-
-    const viewer = await db.User.findByPk(user_id, { attributes: ['id', 'tenant_id', 'user_type'] });
-    if (!viewer) {
-      return res.status(404).json({ status: false, message: 'User not found.' });
-    }
-
-    const candidateWhere = {
-      id: { [Op.notIn]: [...excludeIds] },
-      is_approved: true,
-    };
-    if (userTypeFilter) candidateWhere.user_type = String(userTypeFilter);
-
-    const candidates = await db.User.findAll({
-      where: candidateWhere,
-      attributes: NETWORK_USER_ATTRS,
-      limit: 200,
-      order: [['updated_at', 'DESC']],
-    });
-
-    const viewerPeers = await getAcceptedConnectionPeerIds(user_id);
-    const viewerSkillRows = await db.UserSkill.findAll({
-      where: { user_id },
-      attributes: ['skill_name'],
-    });
-    const viewerSkills = new Set(
-      viewerSkillRows.map((s) => String(s.skill_name || '').toLowerCase()).filter(Boolean),
-    );
-    const candidateSkillsMap = await loadSkillsForUsers(candidates.map((c) => c.id));
-
-    const scored = candidates.map((c) => {
-      const j = c.toJSON ? c.toJSON() : c;
-      let score = 0;
-      const reasons = [];
-
-      if (viewer.tenant_id && String(j.tenant_id) === String(viewer.tenant_id)) {
-        score += 30;
-        reasons.push('Same college');
-      } else if (j.tenant_id) {
-        score += 8;
-        reasons.push('Across colleges');
-      }
-
-      if (viewer.user_type && j.user_type === viewer.user_type) {
-        score += 12;
-        reasons.push(`Also a ${j.user_type}`);
-      }
-
-      return { user: c, score, reasons, mutual: 0 };
-    });
-
-    const peerConnections = await db.Connection.findAll({
-      where: {
-        status: 'accepted',
-        [Op.or]: [
-          { sender_id: { [Op.in]: candidates.map((c) => c.id) } },
-          { receiver_id: { [Op.in]: candidates.map((c) => c.id) } },
-        ],
-      },
-      attributes: ['sender_id', 'receiver_id'],
-    });
-    const peersByCandidate = new Map();
-    for (const row of peerConnections) {
-      const sid = String(row.sender_id);
-      const rid = String(row.receiver_id);
-      if (!peersByCandidate.has(sid)) peersByCandidate.set(sid, new Set());
-      if (!peersByCandidate.has(rid)) peersByCandidate.set(rid, new Set());
-      peersByCandidate.get(sid).add(rid);
-      peersByCandidate.get(rid).add(sid);
-    }
-
-    for (const item of scored) {
-      const uid = String(item.user.id);
-      const theirPeers = peersByCandidate.get(uid) || new Set();
-      let mutual = 0;
-      for (const p of viewerPeers) {
-        if (theirPeers.has(String(p))) mutual += 1;
-      }
-      item.mutual = mutual;
-      if (mutual > 0) {
-        item.score += Math.min(40, mutual * 10);
-        item.reasons.push(`${mutual} mutual connection${mutual > 1 ? 's' : ''}`);
-      }
-      const skills = candidateSkillsMap.get(uid) || [];
-      const shared = skills.filter((s) => viewerSkills.has(String(s).toLowerCase()));
-      if (shared.length) {
-        item.score += Math.min(20, shared.length * 5);
-        item.reasons.push(`Shared skills: ${shared.slice(0, 2).join(', ')}`);
-      }
-    }
-
-    scored.sort((a, b) => b.score - a.score || b.mutual - a.mutual);
-    const total = scored.length;
-    const offset = (pageNum - 1) * limitNum;
-    const pageSlice = scored.slice(offset, offset + limitNum);
-    const users = pageSlice.map((s) => s.user);
-    const enriched = await enrichUsersForNetwork(user_id, users);
-    const suggestions = enriched.map((u, idx) => ({
-      ...u,
-      suggestion_score: pageSlice[idx].score,
-      suggestion_reasons: pageSlice[idx].reasons.slice(0, 3),
-      mutual_connections: pageSlice[idx].mutual,
-    }));
+    const data = await getNetworkSuggestions(user_id, req.query);
 
     return res.status(200).json({
       status: true,
-      data: {
-        suggestions,
-        pagination: {
-          total,
-          page: pageNum,
-          pages: Math.ceil(total / limitNum) || 1,
-          limit: limitNum,
-        },
-      },
+      data,
     });
   } catch (err) {
     return res.status(500).json({

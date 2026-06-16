@@ -12,7 +12,9 @@
     "docker:run": "docker run --env-file .env -p 3030:3030 vidhyalayhub-api",
     "create-super-admin": "node scripts/createSuperAdminMainAdmin.js",
     "create-super-admin-owner": "node scripts/createSuperAdminOwner.js",
-    "migrate": "node database/migrations/runMigrations.js"
+    "migrate": "node database/migrations/runMigrations.js",
+    "seed:demo": "node scripts/seed/seedDemoEnvironment.js",
+    "seed:network": "node scripts/seed/seedNetworkPopulation.js"
   },
   "repository": {
     "type": "git",

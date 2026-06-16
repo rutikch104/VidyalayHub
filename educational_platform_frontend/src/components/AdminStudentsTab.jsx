@@ -7,9 +7,11 @@ import {
   Mail,
   Search,
   UserPlus,
+  Eye,
 } from 'lucide-react';
 import adminService from '@/services/adminService';
 import AdminCreateUserModal from '@/components/AdminCreateUserModal';
+import AdminRegistrationReviewModal from '@/components/admin/AdminRegistrationReviewModal';
 
 function avatarFor(name, existing) {
   const u = existing?.trim();
@@ -42,6 +44,7 @@ export default function AdminStudentsTab({ isCollegeScoped = true, onUsersMutate
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [reviewId, setReviewId] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
@@ -84,6 +87,12 @@ export default function AdminStudentsTab({ isCollegeScoped = true, onUsersMutate
 
   return (
     <div className="space-y-6">
+      <AdminRegistrationReviewModal
+        userId={reviewId}
+        open={Boolean(reviewId)}
+        onClose={() => setReviewId(null)}
+        onUpdated={() => { void loadStudents(); onUsersMutated?.(); }}
+      />
       <AdminCreateUserModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -123,7 +132,7 @@ export default function AdminStudentsTab({ isCollegeScoped = true, onUsersMutate
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {['Pending', 'All', 'Active'].map((f) => (
+            {['Pending', 'Under Review', 'All', 'Active', 'Rejected'].map((f) => (
               <button
                 key={f}
                 type="button"
@@ -178,10 +187,21 @@ export default function AdminStudentsTab({ isCollegeScoped = true, onUsersMutate
                     <p className="truncate text-sm text-muted-foreground">{student.email}</p>
                   </div>
                 </div>
-                <span className={statusBadgeClass(student.status)}>{student.status}</span>
+                <span className={statusBadgeClass(student.status)}>{student.registration_status_label || student.status}</span>
               </div>
+              <p className="mb-1 text-xs text-muted-foreground">
+                {student.studentId || student.rollNumber ? `ID: ${student.studentId || '—'} · Roll: ${student.rollNumber || '—'}` : 'No ID on file'}
+              </p>
               <p className="mb-4 text-xs text-muted-foreground">Registered {formatJoined(student.joinDate)}</p>
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewId(student.id)}
+                  className="inline-flex flex-1 min-w-[120px] items-center justify-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  <Eye className="h-4 w-4" />
+                  Review
+                </button>
                 {student.status === 'Pending' ? (
                   <button
                     type="button"

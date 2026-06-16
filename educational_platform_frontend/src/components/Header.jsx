@@ -1,29 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Search, Bell, MessageSquare, User, Settings, Menu, X, LogOut,
-  ChevronDown, Loader2, Users, FileText, Building2, Briefcase, Calendar, SearchX,
+  Search, Bell, MessageSquare, Menu, X,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import notificationService from '@/services/notificationService';
 import messageService from '@/services/messageService';
 import { runGlobalSearch } from '@/services/searchService';
-import { HighlightMatch } from '@/components/HighlightMatch';
-import { resolveMediaUrl } from '@/services/postService';
-import UserAvatar from '@/components/ui/UserAvatar';
 import { useProfileNavigationOptional } from '@/contexts/ProfileNavigationContext';
+import HeaderProfileMenu from '@/components/header/HeaderProfileMenu';
+import GlobalSearchPanel from '@/components/search/GlobalSearchPanel';
 import InstitutionBranding from '@/components/branding/InstitutionBranding';
-import { PRESENCE_STATUS } from '@/lib/presence';
-
-const FALLBACK_AVATAR =
-  'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150';
+import {
+  addRecentSearch,
+  clearRecentSearches,
+  getRecentSearches,
+  removeRecentSearch,
+} from '@/lib/searchHistory';
 
 /* OS-aware keyboard shortcut hint */
 const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || '');
 const SHORTCUT_HINT = isMac ? '⌘K' : 'Ctrl K';
-
-function headerAvatarSrc(url) {
-  return resolveMediaUrl(url || '') || url || FALLBACK_AVATAR;
-}
 
 /** Score a string field against the query — lower = more relevant */
 function fieldScore(field, q) {
@@ -46,264 +43,16 @@ function sortByRelevance(arr, scoreFn) {
   return [...arr].sort((a, b) => scoreFn(a) - scoreFn(b));
 }
 
-/** Present API names that arrive in ALL CAPS as readable title case */
-function formatDisplayLabel(text) {
-  if (!text || typeof text !== 'string') return text || '';
-  const t = text.trim();
-  if (!t) return '';
-  const letters = t.replace(/[^a-zA-Z]/g, '');
-  if (letters.length > 2 && letters === letters.toUpperCase()) {
-    return t.toLowerCase().replace(/\b\w+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
-  }
-  return t;
-}
-
-/* ── Search results panel (shared desktop + mobile overlay) ── */
-function SearchResultsPanel({
-  query,
-  loading,
-  results,
-  totalHits,
-  focusedIdx,
-  onItemMouseDown,
-  itemRefs,
-  textSnippet,
-  debouncedQuery,
-}) {
-  const empty = !loading && results && totalHits === 0;
-  const hasError = results && Object.keys(results.errors || {}).length > 0;
-
-  if (query.length < 2) {
-    return (
-      <div className="global-search-panel__empty">
-        <Search className="global-search-panel__empty-icon" aria-hidden />
-        <p className="global-search-panel__empty-title">Start typing to search</p>
-        <p className="global-search-panel__empty-hint">Find people, posts, jobs, communities, and events</p>
-      </div>
-    );
-  }
-
-  if (loading && !results) {
-    return (
-      <div className="global-search-panel__loading">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="global-search-panel__skeleton-row">
-            <div className="global-search-panel__skeleton-avatar" />
-            <div className="global-search-panel__skeleton-lines">
-              <div className="global-search-panel__skeleton-line global-search-panel__skeleton-line--wide" />
-              <div className="global-search-panel__skeleton-line global-search-panel__skeleton-line--narrow" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (empty) {
-    return (
-      <div className="global-search-panel__empty">
-        <SearchX className="global-search-panel__empty-icon" aria-hidden />
-        <p className="global-search-panel__empty-title">No results for &ldquo;{query}&rdquo;</p>
-        <p className="global-search-panel__empty-hint">Try different keywords or check your spelling</p>
-      </div>
-    );
-  }
-
-  let flatIdx = 0;
-
-  const section = (icon, label, items, renderItem) => {
-    if (!items?.length) return null;
-    const startIdx = flatIdx;
-    flatIdx += items.length;
-    return (
-      <section className="global-search-panel__section">
-        <h3 className="global-search-panel__section-label">
-          {icon}
-          <span>{label}</span>
-        </h3>
-        <ul className="global-search-panel__list">{items.map((item, i) => renderItem(item, startIdx + i))}</ul>
-      </section>
-    );
-  };
-
-  return (
-    <div className="global-search-panel">
-      {hasError ? (
-        <div className="global-search-panel__notice">
-          Some categories could not be loaded. Showing partial results.
-        </div>
-      ) : null}
-
-      {section(
-        <Users className="h-3.5 w-3.5" aria-hidden />,
-        'People',
-        results?.users,
-        (u, idx) => (
-          <li key={u.id}>
-            <div
-              ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
-              data-idx={idx}
-              className={`global-search-panel__row global-search-panel__row--person ${
-                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
-              }`}
-            >
-              <button
-                type="button"
-                className="global-search-panel__row-main"
-                onMouseDown={() => onItemMouseDown({ type: 'user', data: u })}
-              >
-                <UserAvatar
-                  src={headerAvatarSrc(u.avatar_url)}
-                  alt={formatDisplayLabel(u.name) || 'User'}
-                  size="sm"
-                  showStatus={false}
-                  fallbackSrc={FALLBACK_AVATAR}
-                />
-                <span className="global-search-panel__row-text">
-                  <span className="global-search-panel__row-title">
-                    <HighlightMatch text={formatDisplayLabel(u.name) || 'User'} query={debouncedQuery} />
-                  </span>
-                  <span className="global-search-panel__row-meta capitalize">
-                    {u.user_type || u.role || 'Member'}
-                  </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="global-search-panel__row-action"
-                onMouseDown={() => onItemMouseDown({ type: 'message', data: u })}
-              >
-                Message
-              </button>
-            </div>
-          </li>
-        ),
-      )}
-
-      {section(
-        <FileText className="h-3.5 w-3.5" aria-hidden />,
-        'Posts',
-        results?.posts,
-        (p, idx) => (
-          <li key={p.id}>
-            <button
-              type="button"
-              ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
-              data-idx={idx}
-              className={`global-search-panel__row global-search-panel__row--stacked ${
-                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
-              }`}
-              onMouseDown={() => onItemMouseDown({ type: 'post', data: p })}
-            >
-              <span className="global-search-panel__row-meta">
-                {formatDisplayLabel(p.user?.name) || 'Member'}
-              </span>
-              <span className="global-search-panel__row-snippet">
-                <HighlightMatch text={textSnippet(p.content)} query={debouncedQuery} />
-              </span>
-            </button>
-          </li>
-        ),
-      )}
-
-      {section(
-        <Building2 className="h-3.5 w-3.5" aria-hidden />,
-        'Communities',
-        results?.communities,
-        (c, idx) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
-              data-idx={idx}
-              className={`global-search-panel__row global-search-panel__row--stacked ${
-                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
-              }`}
-              onMouseDown={() => onItemMouseDown({ type: 'community', data: c })}
-            >
-              <span className="global-search-panel__row-title">
-                <HighlightMatch text={formatDisplayLabel(c.name)} query={debouncedQuery} />
-              </span>
-              {c.description ? (
-                <span className="global-search-panel__row-snippet">
-                  <HighlightMatch text={textSnippet(c.description, 100)} query={debouncedQuery} />
-                </span>
-              ) : null}
-            </button>
-          </li>
-        ),
-      )}
-
-      {section(
-        <Briefcase className="h-3.5 w-3.5" aria-hidden />,
-        'Jobs',
-        results?.jobs,
-        (j, idx) => {
-          const title = j.title || j.job_title || 'Role';
-          return (
-            <li key={j.id}>
-              <button
-                type="button"
-                ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
-                data-idx={idx}
-                className={`global-search-panel__row global-search-panel__row--stacked ${
-                  focusedIdx === idx ? 'global-search-panel__row--focused' : ''
-                }`}
-                onMouseDown={() => onItemMouseDown({ type: 'job', data: j })}
-              >
-                <span className="global-search-panel__row-title">
-                  <HighlightMatch text={formatDisplayLabel(title)} query={debouncedQuery} />
-                </span>
-                {j.company_name ? (
-                  <span className="global-search-panel__row-meta">{j.company_name}</span>
-                ) : null}
-              </button>
-            </li>
-          );
-        },
-      )}
-
-      {section(
-        <Calendar className="h-3.5 w-3.5" aria-hidden />,
-        'Events',
-        results?.events,
-        (ev, idx) => (
-          <li key={ev.id}>
-            <button
-              type="button"
-              ref={(el) => { if (itemRefs) itemRefs.current[idx] = el; }}
-              data-idx={idx}
-              className={`global-search-panel__row global-search-panel__row--stacked ${
-                focusedIdx === idx ? 'global-search-panel__row--focused' : ''
-              }`}
-              onMouseDown={() => onItemMouseDown({ type: 'event', data: ev })}
-            >
-              <span className="global-search-panel__row-title">
-                <HighlightMatch text={formatDisplayLabel(ev.title) || 'Event'} query={debouncedQuery} />
-              </span>
-              {ev.start_date ? (
-                <span className="global-search-panel__row-meta">{String(ev.start_date)}</span>
-              ) : null}
-            </button>
-          </li>
-        ),
-      )}
-    </div>
-  );
-}
-
 /* ── Header ── */
 const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobileMenuOpen = false }) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const profileNav = useProfileNavigationOptional();
-  const userMenuRef     = useRef(null);
   const desktopInputRef = useRef(null);
   const mobileInputRef  = useRef(null);
   const globalSearchReq = useRef(0);
   const itemRefs        = useRef([]);
 
   const [isSearchFocused,      setIsSearchFocused]      = useState(false);
-  const [showUserMenu,         setShowUserMenu]          = useState(false);
   const [unreadNotifCount,     setUnreadNotifCount]      = useState(0);
   const [unreadMsgCount,       setUnreadMsgCount]        = useState(0);
   const [globalQuery,          setGlobalQuery]           = useState('');
@@ -314,6 +63,12 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
   const [mobileSearchOpen,     setMobileSearchOpen]      = useState(false);
   const [focusedIdx,           setFocusedIdx]            = useState(-1);
   const [scrolled,             setScrolled]              = useState(false);
+  const [recentSearches,       setRecentSearches]        = useState([]);
+
+  /* Load cached recent searches */
+  useEffect(() => {
+    setRecentSearches(getRecentSearches(user?.id));
+  }, [user?.id]);
 
   /* Scroll-aware shadow */
   useEffect(() => {
@@ -411,14 +166,6 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
     };
   }, [user?.id]);
 
-  /* User menu outside click */
-  useEffect(() => {
-    if (!showUserMenu) return;
-    const close = (e) => { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [showUserMenu]);
-
   const closeSearch = useCallback(() => {
     setSearchPanelOpen(false);
     setGlobalQuery('');
@@ -441,7 +188,6 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
 
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        setShowUserMenu(false);
         if (mobileSearchOpen) setMobileSearchOpen(false);
         closeSearch();
         return;
@@ -468,10 +214,30 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
     itemRefs.current = [];
   }, []);
 
-  const handleLogout = async () => {
-    try { await logout(); setShowUserMenu(false); }
-    catch (e) { console.error('Logout error:', e); }
-  };
+  const persistRecentSearch = useCallback((term) => {
+    const q = String(term || '').trim();
+    if (q.length < 2) return;
+    setRecentSearches(addRecentSearch(user?.id, q));
+  }, [user?.id]);
+
+  const handleTextSearch = useCallback((term) => {
+    const q = String(term || '').trim();
+    if (!q) return;
+    setGlobalQuery(q);
+    setDebouncedGlobalQuery(q);
+    setSearchPanelOpen(true);
+    persistRecentSearch(q);
+    setFocusedIdx(-1);
+    itemRefs.current = [];
+  }, [persistRecentSearch]);
+
+  const handleRemoveRecent = useCallback((term) => {
+    setRecentSearches(removeRecentSearch(user?.id, term));
+  }, [user?.id]);
+
+  const handleClearRecent = useCallback(() => {
+    setRecentSearches(clearRecentSearches(user?.id));
+  }, [user?.id]);
 
   const textSnippet = (s, n = 96) => {
     const t = (s || '').replace(/\s+/g, ' ').trim();
@@ -503,6 +269,8 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
 
   const handleItemAction = useCallback((action) => {
     const { type, data } = action;
+    const activeQuery = debouncedGlobalQuery.trim() || globalQuery.trim();
+    if (activeQuery.length >= 2) persistRecentSearch(activeQuery);
     closeSearch();
     setMobileSearchOpen(false);
     switch (type) {
@@ -514,78 +282,39 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
       case 'event':   sessionStorage.setItem('events_search_prefill', data.title || ''); onNavigate('events'); break;
       default: break;
     }
-  }, [closeSearch, onNavigate, profileNav]);
+  }, [closeSearch, debouncedGlobalQuery, globalQuery, onNavigate, persistRecentSearch, profileNav]);
 
   const showPanel = searchPanelOpen;
 
-  const userMenuDropdown = (compact = false) => (
-    showUserMenu ? (
-      <div className="app-header__menu animate-fade-in" role="menu">
-        <div className="app-header__menu-head">
-          <p className="app-header__menu-name">{user?.name}</p>
-          <p className="app-header__menu-email">{user?.email}</p>
-          {user?.user_type ? (
-            <span className="app-header__menu-role">{user.user_type}</span>
-          ) : null}
-        </div>
-        {!compact ? (
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => { onNavigate('profile'); setShowUserMenu(false); }}
-              className="app-header__menu-item"
-              role="menuitem"
-            >
-              <User /> View Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => { onNavigate('settings'); setShowUserMenu(false); }}
-              className="app-header__menu-item"
-              role="menuitem"
-            >
-              <Settings /> Settings
-            </button>
-            <div className="app-header__menu-divider" />
-            <button
-              type="button"
-              onClick={() => { void handleLogout(); }}
-              className="app-header__menu-item app-header__menu-item--danger"
-              role="menuitem"
-            >
-              <LogOut /> Sign Out
-            </button>
-          </div>
-        ) : (
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => { void handleLogout(); }}
-              className="app-header__menu-item app-header__menu-item--danger"
-              role="menuitem"
-            >
-              <LogOut /> Sign Out
-            </button>
-          </div>
-        )}
-      </div>
-    ) : null
-  );
+  const trimmedQuery = globalQuery.trim();
+  const isIdlePanel = trimmedQuery.length < 2;
 
   /* Shared results panel (desktop + mobile overlay) */
   const panelContent = (
-    <SearchResultsPanel
-      query={globalQuery.trim()}
+    <GlobalSearchPanel
+      query={trimmedQuery}
+      debouncedQuery={debouncedGlobalQuery}
       loading={globalSearchLoading}
       results={globalResults}
       totalHits={totalGlobalHits}
+      recentSearches={recentSearches}
       focusedIdx={focusedIdx}
       onItemMouseDown={handleItemAction}
+      onTextSearch={handleTextSearch}
+      onRemoveRecent={handleRemoveRecent}
+      onClearRecent={handleClearRecent}
       itemRefs={itemRefs}
       textSnippet={textSnippet}
-      debouncedQuery={debouncedGlobalQuery}
     />
   );
+
+  const panelStatusLabel = globalSearchLoading
+    ? null
+    : isIdlePanel
+      ? (recentSearches.length > 0 ? 'Recent searches' : 'Global search')
+      : totalGlobalHits > 0
+        ? `${totalGlobalHits} result${totalGlobalHits === 1 ? '' : 's'}`
+        : 'No matches';
 
   /* ── Minimal super-admin header ── */
   if (currentPage === 'super-admin') {
@@ -595,32 +324,6 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
           <div className="app-header__start">
             <InstitutionBranding onNavigate={onNavigate} variant="header" className="min-w-0" />
             <span className="app-header__super-badge">Super Admin</span>
-          </div>
-          <div className="app-header__end">
-            <div className="app-header__user" ref={userMenuRef}>
-              <button
-                type="button"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                aria-expanded={showUserMenu}
-                aria-haspopup="menu"
-                className={`app-header__user-trigger ${showUserMenu ? 'app-header__user-trigger--open' : ''}`}
-              >
-                <UserAvatar
-                  src={headerAvatarSrc(user?.avatar_url)}
-                  alt={user?.name || 'Admin'}
-                  size="sm"
-                  status={PRESENCE_STATUS.ONLINE}
-                  fallbackSrc={FALLBACK_AVATAR}
-                />
-                <div className="app-header__user-text">
-                  <p className="app-header__user-name">{user?.name || 'Admin'}</p>
-                </div>
-                <ChevronDown
-                  className={`app-header__user-chevron ${showUserMenu ? 'app-header__user-chevron--open' : ''}`}
-                />
-              </button>
-              {userMenuDropdown(true)}
-            </div>
           </div>
         </div>
       </header>
@@ -709,11 +412,7 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
                             Searching…
                           </span>
                         )
-                        : totalGlobalHits > 0
-                          ? `${totalGlobalHits} result${totalGlobalHits === 1 ? '' : 's'}`
-                          : globalQuery.trim().length >= 2
-                            ? 'No matches'
-                            : 'Global search'}
+                        : panelStatusLabel}
                     </span>
                     <span className="app-header__search-panel-hint" aria-hidden>
                       Esc
@@ -737,78 +436,37 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
               <Search />
             </button>
 
-            <nav className="app-header__nav" aria-label="Quick navigation">
-              {[
-                { page: 'library', label: 'Library' },
-                { page: 'teacher', label: 'Teacher' },
-                { page: 'ai-interview', label: 'AI Interview' },
-              ].map((item) => (
-                <button
-                  key={item.page}
-                  type="button"
-                  onClick={() => onNavigate(item.page)}
-                  className={`app-header__nav-item ${currentPage === item.page ? 'app-header__nav-item--active' : ''}`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-
-            <button
-              type="button"
-              onClick={() => onNavigate('notifications')}
-              className={`app-header__icon-btn lg:hidden ${currentPage === 'notifications' ? 'app-header__icon-btn--active' : ''}`}
-              aria-label={unreadNotifCount > 0 ? `Notifications, ${unreadNotifCount} unread` : 'Notifications'}
-            >
-              <Bell />
-              {unreadNotifCount > 0 ? (
-                <span className="app-header__badge">
-                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate('messages')}
-              className={`app-header__icon-btn lg:hidden ${currentPage === 'messages' ? 'app-header__icon-btn--active' : ''}`}
-              aria-label={unreadMsgCount > 0 ? `Messages, ${unreadMsgCount} unread` : 'Messages'}
-            >
-              <MessageSquare />
-              {unreadMsgCount > 0 ? (
-                <span className="app-header__badge">
-                  {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
-                </span>
-              ) : null}
-            </button>
-
-            <div className="app-header__user" ref={userMenuRef}>
+            <div className="app-header__actions" aria-label="Activity">
               <button
                 type="button"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                aria-expanded={showUserMenu}
-                aria-haspopup="menu"
-                className={`app-header__user-trigger ${showUserMenu ? 'app-header__user-trigger--open' : ''}`}
+                onClick={() => onNavigate('messages')}
+                className={`app-header__icon-btn ${currentPage === 'messages' ? 'app-header__icon-btn--active' : ''}`}
+                aria-label={unreadMsgCount > 0 ? `Messages, ${unreadMsgCount} unread` : 'Messages'}
               >
-                <UserAvatar
-                  src={headerAvatarSrc(user?.avatar_url)}
-                  alt={user?.name || 'User'}
-                  size="sm"
-                  status={PRESENCE_STATUS.ONLINE}
-                  fallbackSrc={FALLBACK_AVATAR}
-                />
-                <div className="app-header__user-text">
-                  <p className="app-header__user-name">{user?.name || 'User'}</p>
-                  {user?.user_type ? (
-                    <p className="app-header__user-role">{user.user_type}</p>
-                  ) : null}
-                </div>
-                <ChevronDown
-                  className={`app-header__user-chevron ${showUserMenu ? 'app-header__user-chevron--open' : ''}`}
-                />
+                <MessageSquare />
+                {unreadMsgCount > 0 ? (
+                  <span className="app-header__badge">
+                    {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
+                  </span>
+                ) : null}
               </button>
-              {userMenuDropdown(false)}
+
+              <button
+                type="button"
+                onClick={() => onNavigate('notifications')}
+                className={`app-header__icon-btn ${currentPage === 'notifications' ? 'app-header__icon-btn--active' : ''}`}
+                aria-label={unreadNotifCount > 0 ? `Notifications, ${unreadNotifCount} unread` : 'Notifications'}
+              >
+                <Bell />
+                {unreadNotifCount > 0 ? (
+                  <span className="app-header__badge">
+                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                  </span>
+                ) : null}
+              </button>
             </div>
+
+            <HeaderProfileMenu currentPage={currentPage} onNavigate={onNavigate} />
           </div>
         </div>
       </header>
@@ -828,7 +486,8 @@ const Header = ({ onNavigate, currentPage = 'home', onMobileMenuToggle, isMobile
                 autoComplete="off"
                 spellCheck={false}
                 value={globalQuery}
-                onChange={(e) => { setGlobalQuery(e.target.value); }}
+                onChange={(e) => { setGlobalQuery(e.target.value); setSearchPanelOpen(true); }}
+                onFocus={() => setSearchPanelOpen(true)}
                 onKeyDown={handleSearchKeyDown}
               />
               {globalQuery ? (

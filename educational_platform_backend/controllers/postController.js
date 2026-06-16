@@ -25,6 +25,72 @@ const {
 const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
 const { PUBLIC_BASE_PATH } = require('../config/storageConfig');
 const { inferMediaType } = require('../storage/utils/fileValidation');
+const {
+  enrichPostsWithAcademicIdentity,
+  enrichCommentsWithAcademicIdentity,
+} = require('../utils/academicIdentity');
+const {
+  enrichUsersForNetwork,
+  NETWORK_USER_ATTRS,
+} = require('../utils/networkHelpers');
+const {
+  decoratePostRow,
+  queryAmplifiesList,
+  mergeFeedTimeline,
+} = require('../utils/postAmplifyHelpers');
+
+const POST_AUTHOR_USER_ATTRS = [
+  'id',
+  'first_name',
+  'last_name',
+  'profile_picture',
+  'tenant_id',
+  'user_type',
+];
+
+function postAuthorUserInclude(overrides = {}) {
+  return {
+    model: db.User,
+    as: 'user',
+    attributes: POST_AUTHOR_USER_ATTRS,
+    required: true,
+    include: [
+      {
+        model: db.Tenant,
+        as: 'tenant',
+        attributes: ['tenant_id', 'name', 'short_name'],
+        required: false,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function attachAuthorCollegeFields(plain) {
+  if (!plain || typeof plain !== 'object') return plain;
+  const tenant = plain.user?.tenant || plain.tenant;
+  const collegeName = String(tenant?.name || tenant?.short_name || '').trim();
+  if (plain.user && collegeName) {
+    plain.user.college_name = collegeName;
+    plain.user.tenant_name = collegeName;
+  }
+  if (plain.user?.tenant) {
+    delete plain.user.tenant;
+  }
+  return plain;
+}
+
+function commentAuthorUserInclude(overrides = {}) {
+  return postAuthorUserInclude({ required: false, ...overrides });
+}
+
+function enrichCommentTree(nodes) {
+  (nodes || []).forEach((node) => {
+    attachAuthorCollegeFields(node);
+    enrichCommentTree(node.replies || []);
+  });
+  return nodes;
+}
 
 function enrichPostForClient(plain) {
   if (!plain || typeof plain !== 'object') return plain;
@@ -47,6 +113,7 @@ function enrichPostForClient(plain) {
   if (plain.user?.profile_picture) {
     plain.user.profile_picture = resolveMediaUrl(plain.user.profile_picture);
   }
+  attachAuthorCollegeFields(plain);
   return plain;
 }
 
@@ -73,7 +140,12 @@ async function mentionNotificationRows(mentionIds, reqUser, postId) {
       title: 'You were mentioned in a post',
       body: `${actorLabel} mentioned you in a post`,
       link_url: `/posts/${postId}`,
-      metadata: { actor_id: reqUser.id, target_id: postId },
+      metadata: {
+        actor_id: reqUser.id,
+        target_id: postId,
+        entity_type: 'post',
+        entity_id: postId,
+      },
     });
   }
   return rows;
@@ -150,6 +222,7 @@ exports.createPost = async (req, res) => {
     hashtags,
     type,
     code_language,
+    code_file_name,
     visibility,
     mentioned_users
   } = req.body;
@@ -190,6 +263,7 @@ exports.createPost = async (req, res) => {
         media_urls: uploadedMedia,
         type: postType,
         code_language,
+        code_file_name: code_file_name ? String(code_file_name).trim().slice(0, 120) : null,
         visibility: vis
       }, { transaction: t });
 
@@ -224,11 +298,7 @@ exports.createPost = async (req, res) => {
     // Fetch the created post with associations
     const postWithDetails = await db.Post.findByPk(result.id, {
       include: [
-        {
-          model: db.User,
-          as: 'user',
-          attributes: ['id', 'first_name', 'last_name', 'profile_picture']
-        },
+        postAuthorUserInclude({ required: false }),
         {
           model: db.PostMention,
           as: 'mentions',
@@ -241,10 +311,15 @@ exports.createPost = async (req, res) => {
       ]
     });
 
+    const plain = enrichPostForClient(
+      postWithDetails.get ? postWithDetails.get({ plain: true }) : postWithDetails,
+    );
+    await enrichPostsWithAcademicIdentity([plain]);
+
     return res.status(201).json({
       status: true,
       message: 'Post created successfully.',
-      data: enrichPostForClient(postWithDetails.get ? postWithDetails.get({ plain: true }) : postWithDetails),
+      data: plain,
     });
   } catch (err) {
     console.error('createPost:', err);
@@ -302,12 +377,7 @@ async function queryPostsList(req, { clauses, page, limit, sort }) {
   const { count, rows } = await db.Post.findAndCountAll({
     where,
     include: [
-      {
-        model: db.User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'tenant_id'],
-        required: true,
-      },
+      postAuthorUserInclude(),
       {
         model: db.PostMention,
         as: 'mentions',
@@ -327,6 +397,12 @@ async function queryPostsList(req, { clauses, page, limit, sort }) {
         attributes: ['user_id'],
       },
       {
+        model: db.PostRepost,
+        as: 'reposts',
+        required: false,
+        attributes: ['user_id'],
+      },
+      {
         model: db.Comment,
         as: 'comments',
         separate: true,
@@ -336,7 +412,7 @@ async function queryPostsList(req, { clauses, page, limit, sort }) {
           {
             model: db.User,
             as: 'user',
-            attributes: ['id', 'first_name', 'last_name', 'profile_picture'],
+            attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'user_type'],
           },
         ],
       },
@@ -352,11 +428,10 @@ async function queryPostsList(req, { clauses, page, limit, sort }) {
   const viewerId = req.user.id;
   const posts = rows.map((post) => {
     const plain = post.get({ plain: true });
-    plain.is_liked =
-      Array.isArray(plain.likes) && plain.likes.some((l) => l.user_id === viewerId);
-    plain.is_bookmarked = plain.is_bookmarked || false;
-    return enrichPostForClient(plain);
+    return decoratePostRow(plain, viewerId);
   });
+
+  await enrichPostsWithAcademicIdentity(posts);
 
   return {
     posts,
@@ -415,8 +490,14 @@ exports.getProfilePosts = async (req, res) => {
     if (type) clauses.push({ type });
     if (hashtag) clauses.push({ hashtags: { [Op.contains]: [hashtag] } });
 
-    const data = await queryPostsList(req, { clauses, page, limit, sort });
-    return res.status(200).json({ status: true, data });
+    const lim = Math.min(50, parseInt(String(limit), 10) || 10);
+    const pageNum = parseInt(String(page), 10) || 1;
+    const overLimit = lim * pageNum * 2;
+
+    const data = await queryPostsList(req, { clauses, page: 1, limit: overLimit, sort });
+    const amplifies = await queryAmplifiesList(req, { profileUserId, page: 1, limit: overLimit });
+    const merged = mergeFeedTimeline(data.posts, amplifies.items, { page, limit });
+    return res.status(200).json({ status: true, data: merged });
   } catch (err) {
     console.error('getProfilePosts:', err);
     return res.status(500).json({
@@ -481,8 +562,14 @@ exports.getPosts = async (req, res) => {
       }
     }
 
-    const data = await queryPostsList(req, { clauses, page, limit, sort });
-    return res.status(200).json({ status: true, data });
+    const lim = Math.min(50, parseInt(String(limit), 10) || 10);
+    const pageNum = parseInt(String(page), 10) || 1;
+    const overLimit = lim * pageNum * 2;
+
+    const data = await queryPostsList(req, { clauses, page: 1, limit: overLimit, sort });
+    const amplifies = await queryAmplifiesList(req, { page: 1, limit: overLimit });
+    const merged = mergeFeedTimeline(data.posts, amplifies.items, { page, limit });
+    return res.status(200).json({ status: true, data: merged });
   } catch (err) {
     console.error('getPosts:', err);
     return res.status(500).json({
@@ -500,11 +587,7 @@ exports.getPost = async (req, res) => {
   try {
     const post = await db.Post.findByPk(id, {
       include: [
-        {
-          model: db.User,
-          as: 'user',
-          attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'tenant_id'],
-        },
+        postAuthorUserInclude({ required: false }),
         {
           model: db.PostMention,
           as: 'mentions',
@@ -517,11 +600,14 @@ exports.getPost = async (req, res) => {
         {
           model: db.Like,
           as: 'likes',
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['id', 'first_name', 'last_name', 'profile_picture']
-          }]
+          attributes: ['user_id'],
+          required: false,
+        },
+        {
+          model: db.PostRepost,
+          as: 'reposts',
+          attributes: ['user_id'],
+          required: false,
         },
         {
           model: db.Comment,
@@ -572,10 +658,13 @@ exports.getPost = async (req, res) => {
 
     const plain = post.get({ plain: true });
     plain.is_liked = Array.isArray(plain.likes) && plain.likes.some((l) => l.user_id === req.user.id);
+    plain.is_reposted = Array.isArray(plain.reposts) && plain.reposts.some((r) => r.user_id === req.user.id);
+    const enriched = enrichPostForClient(plain);
+    await enrichPostsWithAcademicIdentity([enriched]);
 
     return res.status(200).json({
       status: true,
-      data: enrichPostForClient(plain)
+      data: enriched
     });
   } catch (err) {
     return res.status(500).json({
@@ -594,6 +683,7 @@ exports.updatePost = async (req, res) => {
     hashtags,
     type,
     code_language,
+    code_file_name,
     visibility,
     mentioned_users
   } = req.body;
@@ -639,6 +729,10 @@ exports.updatePost = async (req, res) => {
         media_urls: nextMediaUrls,
         type: nextType,
         code_language: code_language !== undefined ? code_language : post.code_language,
+        code_file_name:
+          code_file_name !== undefined
+            ? (code_file_name ? String(code_file_name).trim().slice(0, 120) : null)
+            : post.code_file_name,
         visibility: nextVisibility,
         updated_at: new Date()
       }, { transaction: t });
@@ -670,11 +764,7 @@ exports.updatePost = async (req, res) => {
     // Fetch updated post with associations
     const updatedPost = await db.Post.findByPk(id, {
       include: [
-        {
-          model: db.User,
-          as: 'user',
-          attributes: ['id', 'first_name', 'last_name', 'profile_picture']
-        },
+        postAuthorUserInclude({ required: false }),
         {
           model: db.PostMention,
           as: 'mentions',
@@ -687,10 +777,15 @@ exports.updatePost = async (req, res) => {
       ]
     });
 
+    const plain = enrichPostForClient(
+      updatedPost.get ? updatedPost.get({ plain: true }) : updatedPost,
+    );
+    await enrichPostsWithAcademicIdentity([plain]);
+
     return res.status(200).json({
       status: true,
       message: 'Post updated successfully.',
-      data: updatedPost
+      data: plain,
     });
   } catch (err) {
     return res.status(500).json({
@@ -726,6 +821,7 @@ exports.deletePost = async (req, res) => {
       await Promise.all([
         db.PostMention.destroy({ where: { post_id: id }, transaction: t }),
         db.Like.destroy({ where: { post_id: id }, transaction: t }),
+        db.PostRepost.destroy({ where: { post_id: id }, transaction: t }),
         db.Comment.destroy({ where: { post_id: id }, transaction: t })
       ]);
 
@@ -795,7 +891,13 @@ exports.toggleLike = async (req, res) => {
           title: 'New like on your post',
           body: `${actorLabel} liked your post`,
           link_url: `/posts/${id}`,
-          metadata: { actor_id: user_id, target_id: id },
+          metadata: {
+            actor_id: user_id,
+            target_id: id,
+            entity_type: 'post',
+            entity_id: id,
+            content_preview: post.content ? String(post.content).trim().slice(0, 120) : null,
+          },
         });
       }
     }
@@ -814,6 +916,310 @@ exports.toggleLike = async (req, res) => {
       status: false,
       message: 'Error toggling like.',
       error: err.message
+    });
+  }
+};
+
+async function assertPostReadable(req, postId) {
+  const post = await db.Post.findByPk(postId, {
+    include: [{
+      model: db.User,
+      as: 'user',
+      attributes: ['id', 'tenant_id'],
+    }],
+  });
+
+  if (!post) {
+    return { error: { status: 404, message: 'Post not found.' } };
+  }
+
+  const crossTenantDeny =
+    denyIfCrossTenant(req, post.tenant_id) ||
+    denyIfCrossTenant(req, post.user?.tenant_id);
+  if (crossTenantDeny) {
+    return { error: { status: crossTenantDeny.status, message: crossTenantDeny.message } };
+  }
+
+  if (post.visibility === 'private' && post.user_id !== req.user.id) {
+    return { error: { status: 403, message: 'Access denied. This is a private post.' } };
+  }
+
+  if (post.visibility === 'college' && post.user?.tenant_id !== req.user.tenant_id) {
+    return { error: { status: 403, message: 'Access denied. This post is only visible to college members.' } };
+  }
+
+  return { post };
+}
+
+function formatEngagementUserShape(user, extras = {}) {
+  const profilePicture = resolveMediaUrl(user.profile_picture);
+  return {
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    full_name: user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
+    profile_picture: profilePicture,
+    avatar_url: profilePicture,
+    user_type: user.user_type,
+    college_name: user.college_name || null,
+    academic_identity: user.academic_identity || null,
+    professional_identity: user.professional_identity || null,
+    company: user.company || null,
+    position: user.position || null,
+    degree: user.degree || null,
+    branch: user.branch || null,
+    department: user.department || null,
+    academic_year: user.academic_year || null,
+    graduation_batch: user.graduation_batch || null,
+    designation: user.designation || null,
+    is_following: Boolean(user.is_following),
+    ...extras,
+  };
+}
+
+/** GET /api/posts/:id/likes — paginated list of users who liked a post */
+exports.getPostLikes = async (req, res) => {
+  const { id } = req.params;
+  const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit), 10) || 20));
+  const offset = (page - 1) * limit;
+
+  try {
+    const access = await assertPostReadable(req, id);
+    if (access.error) {
+      return res.status(access.error.status).json({ status: false, message: access.error.message });
+    }
+
+    const { count, rows } = await db.Like.findAndCountAll({
+      where: { post_id: id },
+      include: [{
+        model: db.User,
+        as: 'user',
+        attributes: NETWORK_USER_ATTRS,
+        required: true,
+      }],
+      order: [['id', 'DESC']],
+      limit,
+      offset,
+    });
+
+    const users = rows.map((row) => row.user).filter(Boolean);
+    const enriched = await enrichUsersForNetwork(req.user.id, users, { includeMutual: false });
+    const items = enriched.map((u) => formatEngagementUserShape(u));
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        users: items,
+        pagination: {
+          total: count,
+          page,
+          pages: Math.ceil(count / limit) || 1,
+          limit,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('getPostLikes:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Error fetching post likes.',
+      error: err.message,
+    });
+  }
+};
+
+/** GET /api/posts/:id/reposts — paginated list of users who reposted a post */
+exports.getPostReposts = async (req, res) => {
+  const { id } = req.params;
+  const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit), 10) || 20));
+  const offset = (page - 1) * limit;
+
+  try {
+    const access = await assertPostReadable(req, id);
+    if (access.error) {
+      return res.status(access.error.status).json({ status: false, message: access.error.message });
+    }
+
+    const { count, rows } = await db.PostRepost.findAndCountAll({
+      where: { post_id: id },
+      include: [{
+        model: db.User,
+        as: 'user',
+        attributes: NETWORK_USER_ATTRS,
+        required: true,
+      }],
+      order: [['created_at', 'DESC']],
+      limit,
+      offset,
+    });
+
+    const users = rows.map((row) => {
+      const plain = row.get({ plain: true });
+      return plain.user || null;
+    }).filter(Boolean);
+
+    const repostedAtByUserId = new Map(
+      rows.map((row) => {
+        const plain = row.get({ plain: true });
+        return plain.user ? [String(plain.user.id), plain.created_at] : null;
+      }).filter(Boolean),
+    );
+
+    const enriched = await enrichUsersForNetwork(req.user.id, users, { includeMutual: false });
+    const items = enriched.map((u) => formatEngagementUserShape(u, {
+      reposted_at: repostedAtByUserId.get(String(u.id)) || null,
+    }));
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        users: items,
+        pagination: {
+          total: count,
+          page,
+          pages: Math.ceil(count / limit) || 1,
+          limit,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('getPostReposts:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Error fetching post reposts.',
+      error: err.message,
+    });
+  }
+};
+
+/** POST /api/posts/:id/repost — amplify a post once per user; remove via { remove: true } */
+exports.toggleRepost = async (req, res) => {
+  const { id } = req.params;
+  const user_id = req.user.id;
+  const amplifyComment =
+    req.body?.amplify_comment ??
+    req.body?.comment ??
+    null;
+  const remove = Boolean(req.body?.remove);
+
+  try {
+    const access = await assertPostReadable(req, id);
+    if (access.error) {
+      return res.status(access.error.status).json({ status: false, message: access.error.message });
+    }
+
+    const post = access.post;
+    const existing = await db.PostRepost.findOne({
+      where: { post_id: id, user_id },
+    });
+
+    if (existing && remove) {
+      await existing.destroy();
+      if (post.reposts_count > 0) {
+        await post.decrement('reposts_count');
+      }
+      await post.reload();
+      if (post.reposts_count < 0) {
+        await post.update({ reposts_count: 0 });
+        await post.reload();
+      }
+      return res.status(200).json({
+        status: true,
+        message: 'Amplify removed successfully.',
+        data: {
+          is_reposted: false,
+          is_amplified: false,
+          reposts_count: post.reposts_count,
+          amplifies_count: post.reposts_count,
+        },
+      });
+    }
+
+    if (existing) {
+      return res.status(409).json({
+        status: false,
+        code: 'DUPLICATE_AMPLIFY',
+        message: 'You have already amplified this post.',
+        data: {
+          is_reposted: true,
+          is_amplified: true,
+          reposts_count: post.reposts_count,
+          amplifies_count: post.reposts_count,
+          amplify_id: existing.id,
+        },
+      });
+    }
+
+    let amplify;
+    try {
+      amplify = await db.PostRepost.create({
+        post_id: id,
+        user_id,
+        amplify_comment: amplifyComment != null ? String(amplifyComment).trim() || null : null,
+      });
+    } catch (createErr) {
+      const isUnique =
+        createErr?.name === 'SequelizeUniqueConstraintError' ||
+        String(createErr?.message || '').includes('unique') ||
+        String(createErr?.parent?.constraint || '').includes('post_id');
+      if (isUnique) {
+        return res.status(409).json({
+          status: false,
+          code: 'DUPLICATE_AMPLIFY',
+          message: 'You have already amplified this post.',
+        });
+      }
+      throw createErr;
+    }
+
+    await post.increment('reposts_count');
+    await post.reload();
+
+    if (post.user_id !== user_id) {
+      const ok = await NotificationService.shouldSendNotification(post.user_id, 'post_share');
+      if (ok) {
+        const actorLabel = [req.user.first_name, req.user.last_name].filter(Boolean).join(' ').trim()
+          || req.user.name
+          || 'Someone';
+        const preview = amplify.amplify_comment || post.content;
+        await db.Notification.create({
+          user_id: post.user_id,
+          type: 'post_share',
+          title: 'Your post was amplified',
+          body: `${actorLabel} amplified your post`,
+          link_url: `/posts/${id}`,
+          metadata: {
+            actor_id: user_id,
+            target_id: id,
+            entity_type: 'post',
+            entity_id: id,
+            amplify_id: amplify.id,
+            content_preview: preview ? String(preview).trim().slice(0, 120) : null,
+          },
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Post amplified successfully.',
+      data: {
+        is_reposted: true,
+        is_amplified: true,
+        reposts_count: post.reposts_count,
+        amplifies_count: post.reposts_count,
+        amplify_comment: amplify.amplify_comment,
+        amplify_id: amplify.id,
+      },
+    });
+  } catch (err) {
+    console.error('toggleRepost:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Error amplifying post.',
+      error: err.message,
     });
   }
 };
@@ -884,25 +1290,34 @@ exports.addComment = async (req, res) => {
           body: parentComment
             ? `${actorLabel} replied to your comment`
             : `${actorLabel} commented on your post`,
-          link_url: `/posts/${id}`,
-          metadata: { actor_id: user_id, target_id: id },
+          link_url: parentComment
+            ? `/posts/${id}#comment-${comment.id}`
+            : `/posts/${id}#comment-${comment.id}`,
+          metadata: {
+            actor_id: user_id,
+            target_id: id,
+            entity_type: 'post',
+            entity_id: id,
+            comment_id: comment.id,
+            parent_comment_id: parentComment ? parentComment.id : null,
+            content_preview: cleanText ? String(cleanText).trim().slice(0, 120) : null,
+          },
         });
       }
     }
 
     // Fetch comment with user details
     const commentWithUser = await db.Comment.findByPk(comment.id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'profile_picture']
-      }]
+      include: [commentAuthorUserInclude()],
     });
+    const plain = commentWithUser.get({ plain: true });
+    enrichCommentTree([plain]);
+    await enrichCommentsWithAcademicIdentity([plain]);
 
     return res.status(201).json({
       status: true,
       message: 'Comment added successfully.',
-      data: commentWithUser
+      data: plain,
     });
   } catch (err) {
     return res.status(500).json({
@@ -934,11 +1349,7 @@ exports.getComments = async (req, res) => {
 
     const rows = await db.Comment.findAll({
       where: { post_id: id },
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'user_type'],
-      }],
+      include: [commentAuthorUserInclude()],
       order: [['created_at', 'ASC']],
       limit: 500,
     });
@@ -948,6 +1359,8 @@ exports.getComments = async (req, res) => {
     const start = (pg - 1) * lim;
     const paged = sorted.slice(start, start + lim);
     const withEngagement = await attachCommentEngagement(paged, req.user.id);
+    enrichCommentTree(withEngagement);
+    await enrichCommentsWithAcademicIdentity(withEngagement);
 
     return res.status(200).json({
       status: true,
@@ -997,17 +1410,13 @@ exports.updateComment = async (req, res) => {
     await comment.save();
 
     const commentWithUser = await db.Comment.findByPk(comment.id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'profile_picture', 'user_type'],
-      }],
+      include: [commentAuthorUserInclude()],
     });
 
-    const [enriched] = await attachCommentEngagement(
-      [{ ...(commentWithUser.get ? commentWithUser.get({ plain: true }) : commentWithUser), replies: [] }],
-      user_id,
-    );
+    const plainComment = commentWithUser.get({ plain: true });
+    enrichCommentTree([plainComment]);
+    const [enriched] = await attachCommentEngagement([{ ...plainComment, replies: [] }], user_id);
+    await enrichCommentsWithAcademicIdentity([enriched]);
 
     return res.status(200).json({
       status: true,

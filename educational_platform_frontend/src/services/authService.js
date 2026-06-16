@@ -62,12 +62,17 @@ class AuthService {
         return { token, user };
     }
     async register(credentials) {
-        const response = await api.post('/auth/register', credentials);
+        const isFormData = typeof FormData !== 'undefined' && credentials instanceof FormData;
+        const response = await api.post('/auth/register', credentials, isFormData
+            ? { headers: { 'Content-Type': 'multipart/form-data' } }
+            : undefined);
         const { data } = response.data;
         if (data.pending_approval) {
             return {
                 pendingApproval: true,
                 message: data.message,
+                registrationStatus: data.registration_status,
+                registrationStatusLabel: data.registration_status_label,
                 user: data.user,
             };
         }
@@ -78,6 +83,11 @@ class AuthService {
         localStorage.setItem('user', JSON.stringify(user));
         if (user.tenant_slug) localStorage.setItem('tenantSlug', user.tenant_slug);
         return { token, user, pendingApproval: false };
+    }
+    async getRegistrationStatus(email) {
+        const response = await api.get('/auth/registration-status', { params: { email } });
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Could not load registration status.');
     }
     async superAdminLogin(credentials) {
         const response = await api.post('/super-admin-auth/login', credentials);

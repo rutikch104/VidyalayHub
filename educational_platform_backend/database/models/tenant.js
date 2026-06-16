@@ -39,6 +39,36 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true,
         },
+        // ── College profile management (added via ensureTenantProfileSchema) ──
+        short_name: {
+            type: DataTypes.STRING(64),
+            allowNull: true,
+        },
+        description: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        contact_email: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            validate: { isEmail: true },
+        },
+        contact_phone: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        profile_updated_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        logo_updated_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        updated_by: {
+            type: DataTypes.UUID,
+            allowNull: true,
+        },
         status: {
             type: DataTypes.ENUM('pending', 'approved', 'rejected'),
             defaultValue: 'pending',

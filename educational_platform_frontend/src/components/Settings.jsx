@@ -24,16 +24,9 @@ import userService from '@/services/userService';
 import { resolveMediaUrl } from '@/services/postService';
 import PageHeader from '@/components/ui/PageHeader';
 import PlatformTabs from '@/components/ui/PlatformTabs';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import PlatformSelect from '@/components/ui/PlatformSelect';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
 import { Switch } from '@/components/ui/switch';
 
 const DEFAULT_AVATAR =
@@ -115,18 +108,15 @@ function SettingInput({ label, helper, className = '', ...props }) {
 }
 
 // ── Styled select ─────────────────────────────────────────────────────────
-function SettingSelect({ label, helper, children, ...props }) {
+function SettingSelect({ label, helper, children, value, onChange, ...props }) {
   return (
     <div>
       {label && (
         <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
       )}
-      <select
-        className="w-full rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/15"
-        {...props}
-      >
+      <PlatformSelect className="w-full" value={value} onChange={onChange} {...props}>
         {children}
-      </select>
+      </PlatformSelect>
       {helper && <p className="mt-1 text-xs text-muted-foreground">{helper}</p>}
     </div>
   );
@@ -919,23 +909,29 @@ export default function Settings() {
         </button>
       </SettingCard>
 
-      {/* Delete account dialog */}
-      <AlertDialog
+      <ConfirmActionDialog
         open={deleteOpen}
         onOpenChange={(open) => {
           setDeleteOpen(open);
-          if (!open) { setDeletePassword(''); setError(''); }
+          if (!open) {
+            setDeletePassword('');
+            setError('');
+          }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove your profile, posts, connections, and all associated data.
-              This action <strong>cannot be undone</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="my-1">
+        {...CONFIRM_ACTION_PRESETS.deleteAccount}
+        confirmLabel="Yes, delete account"
+        loading={deleting}
+        loadingLabel="Deleting…"
+        confirmDisabled={!deletePassword.trim()}
+        error={error}
+        onConfirm={() => void handleDeleteAccount()}
+        onCancel={() => {
+          setDeleteOpen(false);
+          setDeletePassword('');
+          setError('');
+        }}
+        contextSlot={(
+          <div className="confirm-action-dialog__context confirm-action-dialog__context--preview mt-0 w-full text-left">
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Confirm with your current password
             </label>
@@ -948,22 +944,8 @@ export default function Settings() {
               className="w-full rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-sm text-foreground focus:border-destructive/50 focus:outline-none focus:ring-2 focus:ring-destructive/15"
             />
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting || !deletePassword.trim()}
-              onClick={(e) => { e.preventDefault(); void handleDeleteAccount(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? (
-                <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Deleting…</>
-              ) : (
-                'Yes, delete account'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        )}
+      />
     </div>
   );
 

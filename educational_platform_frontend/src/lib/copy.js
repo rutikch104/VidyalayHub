@@ -1,9 +1,9 @@
 export const COPY = {
   comments: {
     title: 'Comments',
-    placeholder: 'Add a comment…',
+    placeholder: 'Share your thoughts…',
     replyPlaceholder: 'Write a reply…',
-    hint: 'Enter to post · Shift+Enter for new line',
+    hint: '⌘ + Enter to post',
     post: 'Post',
     reply: 'Reply',
     posting: 'Posting…',
@@ -17,8 +17,8 @@ export const COPY = {
     emptyTitle: 'No comments yet',
     emptyBody: 'Start the conversation — share your thoughts on this post.',
     loadMore: 'Load more comments',
-    showReplies: (n) => `View ${n} ${n === 1 ? 'reply' : 'replies'}`,
-    hideReplies: 'Hide replies',
+    showReplies: (n) => `Show ${n} ${n === 1 ? 'reply' : 'replies'}`,
+    hideReplies: (n) => `Hide ${n} ${n === 1 ? 'reply' : 'replies'}`,
     edited: 'Edited',
     deleteConfirm: 'Delete this comment?',
     sort: { latest: 'Latest', oldest: 'Oldest', top: 'Top' },

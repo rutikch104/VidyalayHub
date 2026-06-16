@@ -25,6 +25,7 @@ import {
   CommunityCardSkeleton,
   FeaturedSidebarSkeleton,
 } from './CommunitySkeleton';
+import { NOTIF_NAV_KEYS, consumeStringKey } from '@/lib/notificationNavigation';
 
 const TABS = [
   { id: 'discover',        label: 'Discover',       icon: Compass },
@@ -69,6 +70,11 @@ export default function CommunitiesPage() {
     sessionStorage.removeItem('communities_search_prefill');
     setSearchTerm(p);
     setDebouncedSearch(p);
+  }, []);
+
+  useEffect(() => {
+    const communityId = consumeStringKey(NOTIF_NAV_KEYS.COMMUNITY_ID);
+    if (communityId) setSelectedCommunityId(communityId);
   }, []);
 
   const loadCategories = useCallback(async () => {

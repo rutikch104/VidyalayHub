@@ -1,4 +1,4 @@
-import { Building2, Crown, MapPin, Settings } from 'lucide-react';
+import { MapPin, Crown } from 'lucide-react';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { PRESENCE_STATUS } from '@/lib/presence';
 import { mergeProfileCardData } from '@/lib/homeProfileCardHelpers';
@@ -24,7 +24,6 @@ export default function HomeProfileCard({
   coverSrc,
   avatarSrc,
   onViewProfile,
-  onSettings,
 }) {
   const card = mergeProfileCardData({ user, profile, summary });
   const cover = coverSrc || COVER_FALLBACK;
@@ -42,14 +41,6 @@ export default function HomeProfileCard({
           }}
         />
         <div className="home-profile-card__cover-overlay" aria-hidden />
-        <button
-          type="button"
-          onClick={onSettings}
-          className="home-profile-card__settings"
-          aria-label="Profile settings"
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       <div className="home-profile-card__body">
@@ -81,19 +72,8 @@ export default function HomeProfileCard({
 
           <RoleBadge userType={card.userType} label={card.roleLabel} />
 
-          {(card.institution || card.departmentLine || card.location) && (
+          {(card.location) && (
             <div className="home-profile-card__meta">
-              {card.institution ? (
-                <p className="home-profile-card__meta-row">
-                  <Building2 className="h-3.5 w-3.5 text-primary/70" aria-hidden />
-                  <span title={card.institution}>{card.institution}</span>
-                </p>
-              ) : null}
-              {card.departmentLine ? (
-                <p className="home-profile-card__meta-row">
-                  <span className="ml-[1.375rem] text-foreground/65">{card.departmentLine}</span>
-                </p>
-              ) : null}
               {card.location ? (
                 <p className="home-profile-card__meta-row home-profile-card__meta-row--location">
                   <MapPin className="h-3.5 w-3.5" aria-hidden />

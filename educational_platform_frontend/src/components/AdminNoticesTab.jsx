@@ -1,16 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Megaphone, Loader2, AlertCircle, Plus, Pin, Trash2, Pencil } from 'lucide-react';
 import adminService from '@/services/adminService';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import PlatformSelect from '@/components/ui/PlatformSelect';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
 
 function defaultNowLocal() {
   const now = new Date();
@@ -186,10 +179,11 @@ export default function AdminNoticesTab({ isCollegeScoped }) {
       {!isCollegeScoped ? (
         <div className="rounded-2xl border border-border/50 bg-card/90 p-4 shadow-lg">
           <label className="text-sm font-medium text-muted-foreground">College</label>
-          <select
-            className="mt-1 w-full max-w-md rounded-xl border border-border bg-background px-3 py-2"
+          <PlatformSelect
+            className="mt-1 w-full max-w-md"
             value={tenantId}
             onChange={(ev) => setTenantId(ev.target.value)}
+            placeholder="Select college"
           >
             {colleges.length === 0 ? <option value="">No colleges</option> : null}
             {colleges.map((c) => (
@@ -197,7 +191,7 @@ export default function AdminNoticesTab({ isCollegeScoped }) {
                 {c.name}
               </option>
             ))}
-          </select>
+          </PlatformSelect>
         </div>
       ) : null}
 
@@ -338,38 +332,22 @@ export default function AdminNoticesTab({ isCollegeScoped }) {
         </div>
       </div>
 
-      <AlertDialog
-        open={!!archiveTarget}
-        onOpenChange={(open) => { if (!open && !archiving) setArchiveTarget(null); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive this notice?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {archiveTarget?.title ? (
-                <>
-                  <strong className="text-foreground">{archiveTarget.title}</strong>
-                  {' '}will be removed from the board. It can be restored later from archive.
-                </>
-              ) : (
-                'This notice will be removed from the board. It can be restored later from archive.'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={archiving}
-              onClick={(e) => { e.preventDefault(); void confirmArchive(); }}
-              className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {archiving && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Trash2 className="h-4 w-4" />
-              Archive notice
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionDialog
+        open={Boolean(archiveTarget)}
+        onOpenChange={(open) => {
+          if (!open && !archiving) setArchiveTarget(null);
+        }}
+        title="Archive this notice?"
+        description="This notice will be removed from the board. It can be restored later from archive."
+        confirmLabel="Archive notice"
+        tone={CONFIRM_ACTION_PRESETS.archiveItem.tone}
+        icon={CONFIRM_ACTION_PRESETS.archiveItem.icon}
+        loading={archiving}
+        loadingLabel="Archiving…"
+        contextPreview={archiveTarget?.title}
+        onConfirm={() => void confirmArchive()}
+        onCancel={() => setArchiveTarget(null)}
+      />
     </div>
   );
 }

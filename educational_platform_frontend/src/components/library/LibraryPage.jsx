@@ -23,6 +23,7 @@ import ResourceCard from './ResourceCard';
 import ResourcePreviewModal from './ResourcePreviewModal';
 import UploadResourceModal from './UploadResourceModal';
 import PageHeader from '@/components/ui/PageHeader';
+import PlatformSelect from '@/components/ui/PlatformSelect';
 import ModuleFeedTabs from '@/components/ui/ModuleFeedTabs';
 import ModuleStatsGrid from '@/components/ui/ModuleStatsGrid';
 import EmptyState from '@/components/ui/EmptyState';
@@ -62,11 +63,36 @@ function ViewModeToggle({ viewMode, setViewMode }) {
 }
 
 function ResourceCardSkeleton({ list = false }) {
+  if (list) {
+    return (
+      <div className="lib-resource-card-skeleton lib-resource-card-skeleton--list" aria-hidden>
+        <div className="lib-resource-card-skeleton__block lib-resource-card-skeleton__block--hero" />
+        <div className="lib-resource-card-skeleton__content">
+          <div className="lib-resource-card-skeleton__line lib-resource-card-skeleton__line--title" />
+          <div className="lib-resource-card-skeleton__line lib-resource-card-skeleton__line--md" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={['lib-resource-card-skeleton', list ? 'lib-resource-card-skeleton--list' : ''].join(' ')}
-      aria-hidden
-    />
+    <div className="lib-resource-card-skeleton" aria-hidden>
+      <div className="lib-resource-card-skeleton__hero" />
+      <div className="lib-resource-card-skeleton__body">
+        <div className="lib-resource-card-skeleton__line lib-resource-card-skeleton__line--title" />
+        <div className="lib-resource-card-skeleton__author">
+          <div className="lib-resource-card-skeleton__avatar" />
+          <div className="lib-resource-card-skeleton__author-lines">
+            <div className="lib-resource-card-skeleton__line lib-resource-card-skeleton__line--md" />
+            <div className="lib-resource-card-skeleton__line lib-resource-card-skeleton__line--xs" />
+          </div>
+        </div>
+        <div className="lib-resource-card-skeleton__actions">
+          <div className="lib-resource-card-skeleton__btn lib-resource-card-skeleton__btn--primary" />
+          <div className="lib-resource-card-skeleton__btn" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -431,7 +457,7 @@ export default function LibraryPage() {
                   ) : null}
                 </div>
                 <div className="lib-toolbar-row__filters lg:shrink-0">
-                  <select
+                  <PlatformSelect
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     className="lib-toolbar-row__select"
@@ -442,12 +468,13 @@ export default function LibraryPage() {
                         {s === 'All' ? 'All subjects' : s}
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </PlatformSelect>
+                  <PlatformSelect
                     value={collegeId}
                     onChange={(e) => setCollegeId(e.target.value)}
                     className="lib-toolbar-row__select"
                     aria-label="Filter by college"
+                    placeholder="All colleges"
                   >
                     <option value="">All colleges</option>
                     {colleges.map((c) => (
@@ -455,8 +482,8 @@ export default function LibraryPage() {
                         {c.name}
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </PlatformSelect>
+                  <PlatformSelect
                     value={sort}
                     onChange={(e) => setSort(e.target.value)}
                     className="lib-toolbar-row__select"
@@ -465,7 +492,7 @@ export default function LibraryPage() {
                     <option value="recent">Newest</option>
                     <option value="popular">Most popular</option>
                     <option value="likes">Most liked</option>
-                  </select>
+                  </PlatformSelect>
                   <ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} />
                 </div>
               </div>
@@ -554,6 +581,10 @@ export default function LibraryPage() {
                   doc={doc}
                   viewMode={viewMode}
                   onPreview={handlePreview}
+                  onDownload={handleDownload}
+                  onBookmark={handleBookmark}
+                  isBookmarked={bookmarkedIds.has(doc.id)}
+                  isFeatured={activeTab === 'trending'}
                 />
               ))}
             </div>

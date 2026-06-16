@@ -1,0 +1,342 @@
+/* Vidyalaya Hub — premium dropdown & select design system */
+
+/* ── Shared surface tokens ─────────────────────────────────────── */
+.vh-select-content,
+.vh-dropdown-panel,
+[data-radix-popper-content-wrapper] .vh-select-content,
+[data-radix-popper-content-wrapper] .vh-dropdown-panel {
+  z-index: 200;
+  overflow: hidden;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.55);
+  border-radius: 0.875rem;
+  box-shadow:
+    0 0 0 1px hsl(0 0% 100% / 0.45) inset,
+    0 4px 8px -2px hsl(222 47% 11% / 0.06),
+    0 16px 40px -12px hsl(222 47% 11% / 0.16);
+  animation: vh-dropdown-enter 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vh-dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Select trigger ────────────────────────────────────────────── */
+.vh-select-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 2.625rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  padding: 0.5625rem 0.875rem;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  text-align: left;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.65);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 1px 2px hsl(222 47% 11% / 0.03);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.vh-select-trigger[data-placeholder] {
+  color: hsl(var(--muted-foreground) / 0.75);
+  font-weight: 500;
+}
+
+.vh-select-trigger:hover:not([data-disabled]):not([data-state='open']) {
+  border-color: hsl(var(--border) / 0.9);
+  background: hsl(var(--muted) / 0.25);
+}
+
+.vh-select-trigger:focus-visible,
+.vh-select-trigger[data-state='open'] {
+  outline: none;
+  border-color: hsl(var(--primary) / 0.55);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+}
+
+.vh-select-trigger[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: hsl(var(--muted) / 0.35);
+}
+
+.vh-select-trigger--error {
+  border-color: hsl(var(--destructive) / 0.65);
+}
+
+.vh-select-trigger--error:focus-visible,
+.vh-select-trigger--error[data-state='open'] {
+  box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.14);
+}
+
+.vh-select-trigger__chevron {
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+  transition: transform 200ms ease, color 150ms ease;
+}
+
+.vh-select-trigger[data-state='open'] .vh-select-trigger__chevron {
+  transform: rotate(180deg);
+  color: hsl(var(--primary));
+}
+
+/* ── Select dropdown panel ─────────────────────────────────────── */
+.vh-select-viewport {
+  padding: 0.375rem;
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(18rem, var(--radix-select-content-available-height));
+}
+
+.vh-select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem 0.5rem 2.125rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground) / 0.9);
+  border-radius: 0.625rem;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.vh-select-item[data-highlighted] {
+  background: hsl(var(--muted) / 0.65);
+  color: hsl(var(--foreground));
+}
+
+.vh-select-item[data-state='checked'] {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.vh-select-item[data-highlighted][data-state='checked'] {
+  background: hsl(var(--primary) / 0.14);
+}
+
+.vh-select-item[data-disabled] {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.vh-select-item__check {
+  position: absolute;
+  left: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--primary));
+}
+
+.vh-select-item__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Radix dropdown menu (action / context menus) ────────────── */
+.vh-dropdown-panel {
+  min-width: 10.5rem;
+  padding: 0.375rem;
+}
+
+.vh-dropdown-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border: none;
+  background: transparent;
+  padding: 0.5625rem 0.75rem;
+  border-radius: 0.625rem;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: hsl(var(--foreground) / 0.88);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.vh-dropdown-item:hover,
+.vh-dropdown-item:focus,
+.vh-dropdown-item[data-highlighted] {
+  background: hsl(var(--muted) / 0.6);
+  color: hsl(var(--foreground));
+}
+
+.vh-dropdown-item--danger {
+  color: hsl(var(--destructive));
+}
+
+.vh-dropdown-item--danger:hover,
+.vh-dropdown-item--danger:focus,
+.vh-dropdown-item--danger[data-highlighted] {
+  background: hsl(var(--destructive) / 0.08);
+  color: hsl(var(--destructive));
+}
+
+.vh-dropdown-item[data-disabled] {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.vh-dropdown-label {
+  padding: 0.5rem 0.75rem 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.vh-dropdown-separator {
+  margin: 0.375rem 0;
+  height: 1px;
+  background: hsl(var(--border) / 0.55);
+}
+
+/* ── Custom action menus (post, comment, community) ───────────── */
+.vh-action-menu {
+  position: absolute;
+  z-index: 30;
+  min-width: 10.5rem;
+  overflow: hidden;
+  padding: 0.375rem;
+  border-radius: 0.875rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--card));
+  box-shadow:
+    0 0 0 1px hsl(0 0% 100% / 0.45) inset,
+    0 4px 8px -2px hsl(222 47% 11% / 0.06),
+    0 16px 40px -12px hsl(222 47% 11% / 0.16);
+  animation: vh-dropdown-enter 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vh-action-menu--align-right {
+  right: 0;
+}
+
+.vh-action-menu--align-left {
+  left: 0;
+}
+
+.vh-action-menu__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border: none;
+  background: transparent;
+  padding: 0.5625rem 0.75rem;
+  border-radius: 0.625rem;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground) / 0.88);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.vh-action-menu__item:hover {
+  background: hsl(var(--muted) / 0.6);
+  color: hsl(var(--foreground));
+}
+
+.vh-action-menu__item--danger {
+  color: hsl(var(--destructive));
+}
+
+.vh-action-menu__item--danger:hover {
+  background: hsl(var(--destructive) / 0.08);
+  color: hsl(var(--destructive));
+}
+
+.vh-action-menu__divider {
+  margin: 0.375rem 0;
+  height: 1px;
+  background: hsl(var(--border) / 0.5);
+}
+
+/* ── Native select trigger polish (fallback) ───────────────────── */
+select.platform-select,
+select.vh-native-select {
+  width: 100%;
+  min-height: 2.625rem;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--border) / 0.65);
+  background-color: hsl(var(--card));
+  padding: 0.5625rem 2rem 0.5625rem 0.875rem;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px hsl(222 47% 11% / 0.03);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 14px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+select.platform-select:hover:not(:focus),
+select.vh-native-select:hover:not(:focus) {
+  border-color: hsl(var(--border) / 0.9);
+  background-color: hsl(var(--muted) / 0.2);
+}
+
+select.platform-select:focus,
+select.vh-native-select:focus {
+  outline: none;
+  border-color: hsl(var(--primary) / 0.55);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+}
+
+/* Popover surfaces */
+.vh-popover-panel {
+  padding: 1rem;
+  border-radius: 0.875rem;
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card));
+  box-shadow:
+    0 0 0 1px hsl(0 0% 100% / 0.45) inset,
+    0 16px 40px -12px hsl(222 47% 11% / 0.16);
+}

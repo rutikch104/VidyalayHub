@@ -5,15 +5,21 @@ import connectionService from '@/services/connectionService';
 import { emitNotificationsChanged } from '@/services/notificationService';
 import { emitNetworkChanged } from '@/utils/shellEvents';
 import PageHeader from '@/components/ui/PageHeader';
-import ModuleStatsGrid from '@/components/ui/ModuleStatsGrid';
+import NetworkStatsGrid from '@/components/network/NetworkStatsGrid';
 import ModuleFeedTabs from '@/components/ui/ModuleFeedTabs';
 import EmptyState from '@/components/ui/EmptyState';
 import NetworkSkeleton from './NetworkSkeleton';
 import NetworkPersonCard from './NetworkPersonCard';
 import ConnectRequestModal from './ConnectRequestModal';
+import NetworkConfirmDialog from './NetworkConfirmDialog';
+import PlatformSelect from '@/components/ui/PlatformSelect';
+import { NETWORK_CONFIRM_PRESETS } from './networkConfirmConfig';
+import { NOTIF_NAV_KEYS, consumeStringKey } from '@/lib/notificationNavigation';
 import {
   NETWORK_TABS,
   ROLE_FILTERS,
+  DISCOVER_PAGE_SIZE,
+  DISCOVER_ADVANCED_FILTERS,
   normalizePerson,
   EMPTY_COPY,
 } from './networkUtils';
@@ -24,14 +30,21 @@ export default function NetworkPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [skillFilter, setSkillFilter] = useState('');
+  const [discoverFilters, setDiscoverFilters] = useState({});
+  const [showDiscoverFilters, setShowDiscoverFilters] = useState(false);
   const [people, setPeople] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState(null);
   const [followStats, setFollowStats] = useState(null);
   const [suggestionTotal, setSuggestionTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
   const [connectTarget, setConnectTarget] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [requestMessage, setRequestMessage] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const fetchSeq = useRef(0);
@@ -40,6 +53,13 @@ export default function NetworkPage() {
     const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  useEffect(() => {
+    const tab = consumeStringKey(NOTIF_NAV_KEYS.NETWORK_TAB);
+    if (tab && ['connections', 'pending', 'sent', 'discover', 'suggestions', 'following'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     try {
@@ -56,19 +76,23 @@ export default function NetworkPage() {
     }
   }, []);
 
-  const fetchTabData = useCallback(async () => {
+  const fetchTabData = useCallback(async (append = false, requestPage = 1) => {
     const seq = ++fetchSeq.current;
-    setLoading(true);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError('');
     try {
       let list = [];
+      let resTotal = 0;
+      let resPages = 1;
+
       switch (activeTab) {
         case 'connections': {
           const res = await connectionService.getUserNetwork({
             search: debouncedSearch || undefined,
             user_type: roleFilter !== 'all' ? roleFilter : undefined,
             limit: 48,
-            page: 1,
+            page: requestPage,
           });
           list = (res.users || []).map((u) =>
             normalizePerson(u, {
@@ -76,6 +100,8 @@ export default function NetworkPage() {
               connectionStatus: 'connected',
             }),
           );
+          resTotal = res.total;
+          resPages = res.totalPages;
           break;
         }
         case 'pending': {
@@ -88,6 +114,8 @@ export default function NetworkPage() {
               connectionDirection: 'incoming',
             }),
           );
+          resTotal = res.total;
+          resPages = 1;
           break;
         }
         case 'sent': {
@@ -100,42 +128,55 @@ export default function NetworkPage() {
               connectionDirection: 'outgoing',
             }),
           );
+          resTotal = res.total;
+          resPages = 1;
           break;
         }
         case 'discover': {
-          if (!debouncedSearch && roleFilter === 'all' && !skillFilter.trim()) {
-            list = [];
-            break;
-          }
           const res = await connectionService.discoverUsers({
             q: debouncedSearch || undefined,
             user_type: roleFilter !== 'all' ? roleFilter : undefined,
             skills: skillFilter.trim() || undefined,
-            limit: 36,
-            page: 1,
+            limit: DISCOVER_PAGE_SIZE,
+            page: requestPage,
+            ...Object.fromEntries(
+              Object.entries(discoverFilters).filter(([, v]) => String(v || '').trim()),
+            ),
           });
           list = (res.users || []).map((u) => normalizePerson(u));
+          resTotal = res.total;
+          resPages = res.totalPages;
           break;
         }
         case 'suggestions': {
           const res = await connectionService.getNetworkSuggestions({
             limit: 24,
-            page: 1,
+            page: requestPage,
             user_type: roleFilter !== 'all' ? roleFilter : undefined,
           });
           setSuggestionTotal(res.total);
           list = (res.users || []).map((u) => normalizePerson(u));
+          resTotal = res.total;
+          resPages = res.totalPages;
           break;
         }
         case 'following': {
-          const res = await connectionService.getFollowing({ limit: 48, page: 1 });
+          const res = await connectionService.getFollowing({ limit: 48, page: requestPage });
           list = (res.users || []).map((u) => normalizePerson(u));
+          resTotal = res.total;
+          resPages = res.totalPages;
           break;
         }
         default:
           break;
       }
-      if (seq === fetchSeq.current) setPeople(list);
+
+      if (seq === fetchSeq.current) {
+        setPeople((prev) => (append ? [...prev, ...list] : list));
+        setTotal(resTotal);
+        setTotalPages(resPages);
+        setPage(requestPage);
+      }
       await loadStats();
     } catch (err) {
       if (seq === fetchSeq.current) {
@@ -145,16 +186,20 @@ export default function NetworkPage() {
           'Failed to load network';
         console.error('[Network]', activeTab, msg, err?.response?.data || err);
         setError(msg);
-        setPeople([]);
+        if (!append) setPeople([]);
       }
     } finally {
-      if (seq === fetchSeq.current) setLoading(false);
+      if (seq === fetchSeq.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, [activeTab, debouncedSearch, roleFilter, skillFilter, loadStats]);
+  }, [activeTab, debouncedSearch, roleFilter, skillFilter, discoverFilters, loadStats]);
 
   useEffect(() => {
-    void fetchTabData();
-  }, [fetchTabData]);
+    setPage(1);
+    void fetchTabData(false, 1);
+  }, [activeTab, debouncedSearch, roleFilter, skillFilter, discoverFilters, fetchTabData]);
 
   useEffect(() => {
     const onNetworkChanged = () => {
@@ -165,7 +210,14 @@ export default function NetworkPage() {
     return () => window.removeEventListener('app:network-changed', onNetworkChanged);
   }, [loadStats, fetchTabData]);
 
-  const refresh = () => fetchTabData();
+  const refresh = () => fetchTabData(false, 1);
+  const loadMore = () => {
+    if (loadingMore || loading || page >= totalPages) return;
+    void fetchTabData(true, page + 1);
+  };
+
+  const hasMore = page < totalPages;
+  const supportsPagination = activeTab === 'discover' || activeTab === 'suggestions';
 
   const handleSendRequest = async (userId, message) => {
     setActionBusy(true);
@@ -229,8 +281,10 @@ export default function NetworkPage() {
       emitNetworkChanged();
       await loadStats();
       await refresh();
+      return true;
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Failed to decline request');
+      return false;
     } finally {
       setActionBusy(false);
     }
@@ -244,8 +298,10 @@ export default function NetworkPage() {
       emitNetworkChanged();
       await loadStats();
       await refresh();
+      return true;
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Failed to withdraw request');
+      return false;
     } finally {
       setActionBusy(false);
     }
@@ -259,8 +315,10 @@ export default function NetworkPage() {
       emitNetworkChanged();
       await loadStats();
       await refresh();
+      return true;
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Failed to remove connection');
+      return false;
     } finally {
       setActionBusy(false);
     }
@@ -280,12 +338,50 @@ export default function NetworkPage() {
 
   const handleUnfollow = async (person) => {
     setActionBusy(true);
+    setError('');
     try {
       await connectionService.unfollowUser(person.userId);
       await refresh();
+      return true;
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to unfollow user');
+      return false;
     } finally {
       setActionBusy(false);
     }
+  };
+
+  const findPersonByConnectionId = (connectionId) =>
+    people.find((p) => String(p.connectionId) === String(connectionId));
+
+  const requestRemove = (connectionId) => {
+    const person = findPersonByConnectionId(connectionId);
+    if (person) setConfirmAction({ type: 'remove', person, connectionId });
+  };
+
+  const requestDecline = (connectionId) => {
+    const person = findPersonByConnectionId(connectionId);
+    if (person) setConfirmAction({ type: 'decline', person, connectionId });
+  };
+
+  const requestWithdraw = (connectionId) => {
+    const person = findPersonByConnectionId(connectionId);
+    if (person) setConfirmAction({ type: 'withdraw', person, connectionId });
+  };
+
+  const requestUnfollow = (person) => {
+    setConfirmAction({ type: 'unfollow', person });
+  };
+
+  const executeConfirm = async () => {
+    if (!confirmAction || actionBusy) return;
+    const { type, person, connectionId } = confirmAction;
+    let ok = false;
+    if (type === 'remove') ok = await handleRemove(connectionId);
+    else if (type === 'decline') ok = await handleDecline(connectionId);
+    else if (type === 'withdraw') ok = await handleWithdraw(connectionId);
+    else if (type === 'unfollow') ok = await handleUnfollow(person);
+    if (ok) setConfirmAction(null);
   };
 
   const tabCounts = {
@@ -306,10 +402,38 @@ export default function NetworkPage() {
 
   const statItems = stats
     ? [
-        { label: 'Connections', value: stats.accepted || 0, icon: Users },
-        { label: 'Invitations', value: stats.pending_received || 0, icon: UserCheck },
-        { label: 'Sent', value: stats.pending_sent || 0, icon: Send },
-        { label: 'Following', value: followStats?.following_count || 0, icon: Sparkles },
+        {
+          key: 'connections',
+          label: 'Connections',
+          value: stats.accepted || 0,
+          description: 'Your professional network',
+          icon: Users,
+          tone: 'sky',
+        },
+        {
+          key: 'pending',
+          label: 'Invitations',
+          value: stats.pending_received || 0,
+          description: 'Requests waiting for you',
+          icon: UserCheck,
+          tone: 'emerald',
+        },
+        {
+          key: 'sent',
+          label: 'Sent',
+          value: stats.pending_sent || 0,
+          description: 'Awaiting a response',
+          icon: Send,
+          tone: 'amber',
+        },
+        {
+          key: 'following',
+          label: 'Following',
+          value: followStats?.following_count || 0,
+          description: 'People you follow',
+          icon: Sparkles,
+          tone: 'violet',
+        },
       ]
     : [];
 
@@ -349,7 +473,12 @@ export default function NetworkPage() {
         />
 
         {statItems.length > 0 ? (
-          <ModuleStatsGrid className="net-page__stats" items={statItems} theme="sky" />
+          <NetworkStatsGrid
+            className="net-page__stats"
+            items={statItems}
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+          />
         ) : null}
 
         <div className="net-feed-tabs">
@@ -378,8 +507,10 @@ export default function NetworkPage() {
                   type="search"
                   placeholder={
                     activeTab === 'discover'
-                      ? 'Search by name, bio, or location…'
-                      : 'Search your network…'
+                      ? 'Search name, college, degree, branch, skills, company…'
+                      : activeTab === 'suggestions'
+                        ? 'Filter suggestions by role below'
+                        : 'Search your network…'
                   }
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -401,7 +532,7 @@ export default function NetworkPage() {
                 {(activeTab === 'connections' ||
                   activeTab === 'suggestions' ||
                   activeTab === 'discover') && (
-                  <select
+                  <PlatformSelect
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
                     className="net-toolbar-row__select"
@@ -412,20 +543,46 @@ export default function NetworkPage() {
                         {f.label}
                       </option>
                     ))}
-                  </select>
+                  </PlatformSelect>
                 )}
                 {activeTab === 'discover' && (
-                  <input
-                    type="text"
-                    placeholder="Filter by skill"
-                    value={skillFilter}
-                    onChange={(e) => setSkillFilter(e.target.value)}
-                    className="net-toolbar-row__select"
-                    aria-label="Filter by skill"
-                  />
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Filter by skill"
+                      value={skillFilter}
+                      onChange={(e) => setSkillFilter(e.target.value)}
+                      className="net-toolbar-row__select"
+                      aria-label="Filter by skill"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscoverFilters((v) => !v)}
+                      className="net-toolbar-row__select whitespace-nowrap font-semibold text-primary"
+                    >
+                      {showDiscoverFilters ? 'Hide filters' : 'More filters'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
+            {activeTab === 'discover' && showDiscoverFilters ? (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {DISCOVER_ADVANCED_FILTERS.map((f) => (
+                  <input
+                    key={f.key}
+                    type="text"
+                    placeholder={f.placeholder}
+                    value={discoverFilters[f.key] || ''}
+                    onChange={(e) =>
+                      setDiscoverFilters((prev) => ({ ...prev, [f.key]: e.target.value }))
+                    }
+                    className="net-toolbar-row__select"
+                    aria-label={f.label}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -455,7 +612,9 @@ export default function NetworkPage() {
         {!loading && people.length > 0 ? (
           <div className="net-content-chrome">
             <p className="net-content-chrome__count">
-              {people.length} {people.length === 1 ? 'person' : 'people'}
+              Showing {people.length}
+              {total > people.length ? ` of ${total}` : ''}{' '}
+              {total === 1 ? 'person' : 'people'}
               {debouncedSearch ? ` matching “${debouncedSearch}”` : ''}
             </p>
           </div>
@@ -492,11 +651,6 @@ export default function NetworkPage() {
                       .
                     </p>
                   ) : null}
-                  {activeTab === 'discover' && !debouncedSearch ? (
-                    <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Type a name or skill to start searching
-                    </p>
-                  ) : null}
                   {activeTab === 'connections' ? (
                     <button
                       type="button"
@@ -514,23 +668,37 @@ export default function NetworkPage() {
               }
             />
           ) : (
-            <div className="platform-stagger net-people-grid">
-              {people.map((person) => (
-                <NetworkPersonCard
-                  key={`${activeTab}-${person.userId}`}
-                  person={person}
-                  variant={cardVariant}
-                  busy={actionBusy}
-                  onConnect={setConnectTarget}
-                  onAccept={handleAccept}
-                  onDecline={handleDecline}
-                  onWithdraw={handleWithdraw}
-                  onRemove={handleRemove}
-                  onFollow={handleFollow}
-                  onUnfollow={handleUnfollow}
-                />
-              ))}
-            </div>
+            <>
+              <div className="platform-stagger net-people-grid">
+                {people.map((person) => (
+                  <NetworkPersonCard
+                    key={`${activeTab}-${person.userId}`}
+                    person={person}
+                    variant={cardVariant}
+                    busy={actionBusy}
+                    onConnect={setConnectTarget}
+                    onAccept={handleAccept}
+                    onDecline={requestDecline}
+                    onWithdraw={requestWithdraw}
+                    onRemove={requestRemove}
+                    onFollow={handleFollow}
+                    onUnfollow={requestUnfollow}
+                  />
+                ))}
+              </div>
+              {supportsPagination && hasMore ? (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="rounded-full border border-border/60 bg-card px-6 py-2.5 text-sm font-semibold text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary/5 disabled:opacity-60"
+                  >
+                    {loadingMore ? 'Loading…' : `Load more (${people.length} of ${total})`}
+                  </button>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -545,6 +713,17 @@ export default function NetworkPage() {
         }}
         onSend={handleSendRequest}
         sending={actionBusy}
+      />
+
+      <NetworkConfirmDialog
+        open={Boolean(confirmAction)}
+        preset={confirmAction ? NETWORK_CONFIRM_PRESETS[confirmAction.type] : null}
+        person={confirmAction?.person}
+        loading={actionBusy}
+        onCancel={() => {
+          if (!actionBusy) setConfirmAction(null);
+        }}
+        onConfirm={executeConfirm}
       />
     </div>
   );

@@ -13,7 +13,12 @@ import EmptyState from '@/components/ui/EmptyState';
 import NotificationItem from '@/components/notifications/NotificationItem';
 import NotificationListSkeleton from '@/components/notifications/NotificationListSkeleton';
 import NotificationFeedChrome from '@/components/notifications/NotificationFeedChrome';
-import { isNotificationUnread } from '@/components/notifications/notificationUtils';
+import {
+  isNotificationUnread,
+  groupNotificationsForDisplay,
+  getDisplayEntryIds,
+  isDisplayEntryUnread,
+} from '@/components/notifications/notificationUtils';
 
 const FILTER_TABS = [
   { key: 'all', label: 'All' },
@@ -21,7 +26,7 @@ const FILTER_TABS = [
   { key: 'read', label: 'Read' },
 ];
 
-export default function Notifications() {
+export default function Notifications({ onNavigate }) {
   const [notifications, setNotifications] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -128,14 +133,6 @@ export default function Notifications() {
     }
   };
 
-  const toggleNotificationSelection = (notificationId) => {
-    setSelectedNotifications((prev) =>
-      prev.includes(notificationId)
-        ? prev.filter((id) => id !== notificationId)
-        : [...prev, notificationId],
-    );
-  };
-
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
       const unread = isNotificationUnread(n);
@@ -145,16 +142,34 @@ export default function Notifications() {
     });
   }, [notifications, filter]);
 
+  const displayEntries = useMemo(
+    () => groupNotificationsForDisplay(filteredNotifications),
+    [filteredNotifications],
+  );
+
+  const isEntrySelected = (entry) => {
+    const ids = getDisplayEntryIds(entry);
+    return ids.length > 0 && ids.every((id) => selectedNotifications.includes(id));
+  };
+
+  const toggleEntrySelection = (entry) => {
+    const ids = getDisplayEntryIds(entry);
+    const allSelected = ids.every((id) => selectedNotifications.includes(id));
+    setSelectedNotifications((prev) => {
+      if (allSelected) return prev.filter((id) => !ids.includes(id));
+      return [...new Set([...prev, ...ids])];
+    });
+  };
+
   const allVisibleSelected =
-    filteredNotifications.length > 0 &&
-    filteredNotifications.every((n) => selectedNotifications.includes(n.id));
+    displayEntries.length > 0 && displayEntries.every(isEntrySelected);
 
   const handleSelectAllVisible = () => {
     if (allVisibleSelected) {
-      const visibleIds = new Set(filteredNotifications.map((n) => n.id));
+      const visibleIds = new Set(displayEntries.flatMap(getDisplayEntryIds));
       setSelectedNotifications((prev) => prev.filter((id) => !visibleIds.has(id)));
     } else {
-      const ids = filteredNotifications.map((n) => n.id);
+      const ids = displayEntries.flatMap(getDisplayEntryIds);
       setSelectedNotifications((prev) => [...new Set([...prev, ...ids])]);
     }
   };
@@ -169,7 +184,7 @@ export default function Notifications() {
           : stats?.total || 0,
   }));
 
-  const unreadInList = filteredNotifications.filter(isNotificationUnread).length;
+  const unreadInList = displayEntries.filter(isDisplayEntryUnread).length;
 
   return (
     <div className="platform-page">
@@ -262,7 +277,7 @@ export default function Notifications() {
             activeKey={filter}
             onChange={setFilter}
             loading={loading}
-            listCount={filteredNotifications.length}
+            listCount={displayEntries.length}
             unreadInList={unreadInList}
             filter={filter}
             allSelected={allVisibleSelected}
@@ -272,7 +287,7 @@ export default function Notifications() {
           <section className="notif-feed" aria-label="Notification feed">
           {loading ? (
             <NotificationListSkeleton count={5} />
-          ) : filteredNotifications.length === 0 ? (
+          ) : displayEntries.length === 0 ? (
             <div className="notif-feed__empty px-4 py-10 sm:px-6">
               <EmptyState
                 icon={Bell}
@@ -286,14 +301,15 @@ export default function Notifications() {
             </div>
           ) : (
             <div className="notif-feed__list platform-stagger">
-              {filteredNotifications.map((n) => (
+              {displayEntries.map((entry) => (
                 <NotificationItem
-                  key={n.id}
-                  notification={n}
-                  selected={selectedNotifications.includes(n.id)}
-                  onToggleSelect={() => toggleNotificationSelection(n.id)}
+                  key={entry.id}
+                  entry={entry}
+                  selected={isEntrySelected(entry)}
+                  onToggleSelect={() => toggleEntrySelection(entry)}
                   onMarkRead={handleMarkAsRead}
                   onDelete={handleDeleteNotification}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>

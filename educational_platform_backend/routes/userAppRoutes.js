@@ -34,6 +34,7 @@ router.delete('/projects/:id', profileSectionsController.deleteProfileProject);
 router.put('/profile/teaching-info', profileSectionsController.putProfileTeachingInfo);
 router.get('/profile', userApiController.getProfile);
 router.put('/profile', userApiController.updateProfile);
+router.put('/profile/onboarding', userApiController.updateOnboardingProfile);
 router.post('/profile/avatar', upload.avatar, userApiController.uploadAvatar);
 router.post('/profile/cover', upload.cover, userApiController.uploadCover);
 router.get('/settings', userApiController.getSettings);

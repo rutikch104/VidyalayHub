@@ -3,8 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import userService from '@/services/userService';
-import { formatPostFromApi } from '@/services/postService';
-import PostCard from '@/components/PostCard';
+import { formatPostFromApi, formatFeedItemFromApi } from '@/services/postService';
+import FeedPostCard from '@/components/posts/FeedPostCard';
 
 export default function ProfileActivity({ onNavigate }) {
   const { user } = useAuth();
@@ -17,7 +17,7 @@ export default function ProfileActivity({ onNavigate }) {
     try {
       const response = await userService.getUserPosts(user.id, { page: 1, limit: 100 });
       const raw = response.posts || [];
-      setPosts(raw.map((p) => formatPostFromApi(p)).filter(Boolean));
+      setPosts(raw.map((p) => formatFeedItemFromApi(p)).filter(Boolean));
     } catch {
       setPosts([]);
     } finally {
@@ -30,7 +30,33 @@ export default function ProfileActivity({ onNavigate }) {
   }, [fetchAll]);
 
   const handlePostDeleted = (postId) => {
-    setPosts((prev) => prev.filter((p) => String(p.id) !== String(postId)));
+    setPosts((prev) => prev.filter((p) => p.id !== postId && p.original_post_id !== postId));
+  };
+
+  const handleAmplifyRemoved = (amplifyItem, res) => {
+    setPosts((prev) => prev.filter((p) => p.id !== amplifyItem.id));
+    if (res && !res.is_amplified && amplifyItem?.original_post_id) {
+      setPosts((prev) =>
+        prev.map((p) =>
+          String(p.id) === String(amplifyItem.original_post_id)
+            ? { ...p, is_amplified: false, is_reposted: false, reposts_count: res.reposts_count ?? p.reposts_count }
+            : p,
+        ),
+      );
+    }
+  };
+
+  const handleAmplifyStateChange = (postId, res) => {
+    if (res?.is_amplified || res?.is_reposted) return;
+    setPosts((prev) =>
+      prev
+        .filter((p) => !(p.feed_type === 'amplify' && String(p.original_post_id) === String(postId)))
+        .map((p) =>
+          String(p.id) === String(postId)
+            ? { ...p, is_amplified: false, is_reposted: false, reposts_count: res.reposts_count ?? p.reposts_count }
+            : p,
+        ),
+    );
   };
 
   const handlePostEdited = (updated) => {
@@ -74,7 +100,7 @@ export default function ProfileActivity({ onNavigate }) {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Your activity</h1>
-            <p className="text-sm text-muted-foreground">All posts, likes, and engagement in one place</p>
+            <p className="text-sm text-muted-foreground">Posts, amplifies, and engagement in one place</p>
           </div>
         </div>
 
@@ -91,11 +117,13 @@ export default function ProfileActivity({ onNavigate }) {
         ) : (
           <div className="space-y-4">
             {posts.map((post) => (
-              <PostCard
+              <FeedPostCard
                 key={post.id}
-                post={post}
+                item={post}
                 onPostDeleted={handlePostDeleted}
                 onPostEdited={handlePostEdited}
+                onAmplifyRemoved={handleAmplifyRemoved}
+                onAmplifyStateChange={handleAmplifyStateChange}
               />
             ))}
           </div>

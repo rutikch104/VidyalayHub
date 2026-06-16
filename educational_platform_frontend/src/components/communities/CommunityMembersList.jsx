@@ -4,6 +4,7 @@ import { Search, Crown, Shield, User, MoreHorizontal, UserMinus, ArrowUpRight, L
 import communitiesService from '@/services/communitiesService';
 import { useProfileNavigationOptional } from '@/contexts/ProfileNavigationContext';
 import { avatarOrFallback, canModerateCommunity, canAdminCommunity } from './communityUtils';
+import AcademicIdentityLine from '@/components/user/AcademicIdentityLine';
 import { MemberRowSkeleton } from './CommunitySkeleton';
 
 const ROLE_OPTIONS = [
@@ -175,9 +176,10 @@ export default function CommunityMembersList({ community, onChange }) {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-foreground">{name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {m.user_type || m.tagline || 'Member'}
-                    </p>
+                    <AcademicIdentityLine
+                      user={m}
+                      className="academic-identity-line--compact comm-member-identity line-clamp-2"
+                    />
                   </div>
                 </button>
 

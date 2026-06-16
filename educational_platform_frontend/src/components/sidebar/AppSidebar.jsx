@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils';
 import { SidebarProvider, useSidebar } from './SidebarProvider';
 import SidebarHeader from './SidebarHeader';
 import SidebarNav from './SidebarNav';
-import SidebarFooter from './SidebarFooter';
 
 function SidebarShell({ collapsed, className, children, isMobile = false }) {
   return (
@@ -68,7 +67,6 @@ function AppSidebarInner({
         <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1">
           <SidebarNav {...navProps} />
         </div>
-        <SidebarFooter currentPage={currentPage} onNavigate={handleNavigate} />
       </SidebarShell>
 
       {mobileOpen ? (
@@ -88,7 +86,6 @@ function AppSidebarInner({
             <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1">
               <SidebarNav {...navProps} />
             </div>
-            <SidebarFooter currentPage={currentPage} onNavigate={handleNavigate} />
           </SidebarShell>
         </div>
       ) : null}

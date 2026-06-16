@@ -5,6 +5,11 @@ const db = require('../database/index');
 const { resolveMediaUrl } = require('../utils/resolveMediaUrl');
 const { enrichUserWithTenantBranding } = require('../utils/tenantBranding');
 const { resolvePortalAccessForAccount } = require('../utils/portalAccess');
+const {
+  createCampusRegistration,
+  getRegistrationStatusByEmail,
+  registrationStatusLabel,
+} = require('../services/campusRegistrationService');
 
 const { getJwtSecret } = require('../utils/jwtSecret');
 
@@ -125,23 +130,26 @@ async function signToken(user) {
 
 exports.register = async (req, res) => {
   try {
+    const body = req.body || {};
     const {
-      email,
-      password,
+      tenant_id: tenantIdBody,
+      user_type = 'student',
       first_name,
       last_name,
-      user_type = 'student',
-      tenant_id: tenantIdBody,
-      gender,
-      dob,
-      phone_number,
-    } = req.body;
+      full_name,
+    } = body;
 
-    if (!email || !password) {
+    if (!body.email || !body.password) {
       return res.status(400).json({
         status: false,
         message: 'Email and password are required.',
       });
+    }
+
+    if (!first_name && full_name) {
+      const parts = String(full_name).trim().split(/\s+/).filter(Boolean);
+      body.first_name = parts[0] || '';
+      body.last_name = parts.slice(1).join(' ') || '';
     }
 
     let tenant_id;
@@ -161,54 +169,11 @@ exports.register = async (req, res) => {
     const needsCollegeApproval =
       !legacyAuto && ['student', 'teacher', 'alumni'].includes(utLower);
 
-    const existing = await db.User.findOne({ where: { email: String(email).toLowerCase().trim() } });
-    if (existing) {
-      return res.status(409).json({
-        status: false,
-        message: 'An account with this email already exists.',
-      });
-    }
-
-    const password_hash = await bcrypt.hash(String(password), 10);
-
-    const defaultRole = await db.Role.findOne({ where: { name: 'USER' }, attributes: ['id'] });
-    const transaction = await db.sequelize.transaction();
-    let user;
-    try {
-      user = await db.User.create(
-        {
-          tenant_id,
-          user_type,
-          first_name,
-          last_name,
-          gender: gender || null,
-          dob: dob || null,
-          email: String(email).toLowerCase().trim(),
-          role_id: defaultRole?.id || null,
-          phone_number: phone_number || null,
-          password_hash,
-          is_approved: !needsCollegeApproval,
-          password_changed_at: new Date(),
-        },
-        { transaction }
-      );
-
-      if (user_type === 'student') {
-        await db.StudentDetail.create({ user_id: user.id }, { transaction });
-      } else if (user_type === 'teacher') {
-        await db.TeacherDetail.create({ user_id: user.id }, { transaction });
-      } else if (user_type === 'alumni') {
-        await db.AlumniDetail.create({ user_id: user.id }, { transaction });
-      }
-
-      await transaction.commit();
-    } catch (createErr) {
-      await transaction.rollback();
-      throw createErr;
-    }
-
-    const userWithRole = await db.User.findByPk(user.id, {
-      include: [{ model: db.Role, as: 'roleRef', attributes: ['id', 'name'] }],
+    const userWithRole = await createCampusRegistration({
+      body: { ...body, user_type: utLower, tenant_id },
+      files: req.files,
+      tenantId: tenant_id,
+      needsCollegeApproval,
     });
 
     if (needsCollegeApproval) {
@@ -216,32 +181,52 @@ exports.register = async (req, res) => {
         status: true,
         data: {
           pending_approval: true,
+          registration_status: userWithRole.registration_status,
+          registration_status_label: registrationStatusLabel(userWithRole.registration_status),
           message:
-            'Registration submitted. Sign in after your college administrator approves your account in the admin portal.',
-          user: publicUser(userWithRole || user),
+            'Your registration has been submitted successfully and is awaiting verification by your college administration.',
+          user: publicUser(userWithRole),
         },
       });
     }
 
-    const token = await signToken(userWithRole || user);
+    const token = await signToken(userWithRole);
 
     return res.status(201).json({
       status: true,
       data: {
         token,
-        user: publicUser(userWithRole || user),
+        user: publicUser(userWithRole),
       },
     });
   } catch (err) {
     console.error('register error:', err);
+    const status = err.statusCode || (err.name === 'SequelizeUniqueConstraintError' ? 409 : 500);
     const msg =
       err && err.name === 'SequelizeUniqueConstraintError'
         ? 'An account with this email already exists.'
         : err.message || 'Registration failed.';
-    return res.status(500).json({
+    return res.status(status).json({
       status: false,
       message: msg,
     });
+  }
+};
+
+exports.getRegistrationStatus = async (req, res) => {
+  try {
+    const email = req.query.email || req.body?.email;
+    const data = await getRegistrationStatusByEmail(email);
+    if (!data) {
+      return res.status(404).json({
+        status: false,
+        message: 'No registration found for this email address.',
+      });
+    }
+    return res.status(200).json({ status: true, data });
+  } catch (err) {
+    console.error('getRegistrationStatus error:', err);
+    return res.status(500).json({ status: false, message: err.message || 'Failed to load status.' });
   }
 };
 
@@ -285,10 +270,16 @@ exports.signin = async (req, res) => {
       portalMeta.access === 'college' || portalMeta.access === 'platform';
 
     if (!user.is_approved && !isStaffAdmin) {
+      const statusLabel = registrationStatusLabel(user.registration_status);
       return res.status(403).json({
         status: false,
         message:
-          'Your account is pending approval from your college administrator. You can sign in after they activate your account.',
+          user.registration_status === 'rejected'
+            ? `Your registration was rejected. ${user.registration_rejection_reason || 'Contact your college administration for details.'}`
+            : user.registration_status === 'needs_info'
+              ? `Additional information is required: ${user.registration_admin_notes || 'Please contact your college administration.'}`
+              : `Your account is ${statusLabel.toLowerCase()}. Sign in after your college administrator approves your registration.`,
+        registration_status: user.registration_status,
       });
     }
 

@@ -1,4 +1,5 @@
 import { roleLabel } from '@/components/network/networkUtils';
+import { resolveAcademicIdentity } from '@/lib/academicIdentity';
 
 const GENERIC_TITLES = new Set(['student', 'teacher', 'alumni', 'staff', 'user', 'member']);
 
@@ -106,14 +107,14 @@ export function mergeProfileCardData({ user, profile, summary } = {}) {
   });
 
   const headline = buildProfileHeadline({
-    headline: profile?.headline,
+    headline: profile?.academic_identity || profile?.headline,
     title: user?.title || profile?.title,
     position: profile?.position,
     course: profile?.course,
     department: profile?.department,
     company: profile?.company || institution,
     userType,
-  });
+  }) || resolveAcademicIdentity({ ...profile, user_type: userType });
 
   const departmentLine = buildDepartmentLine({
     department: profile?.department,
@@ -141,19 +142,36 @@ export function normalizeSuggestionPerson(raw, avatarResolver) {
     'Member';
   const userType = resolveUserRole(raw.user_type);
   const institution = buildInstitutionLine({ collegeName: raw.college_name });
+  const academic_identity =
+    raw.academic_identity?.trim() || resolveAcademicIdentity(raw) || null;
+  const professional_identity = raw.professional_identity?.trim() || null;
 
   return {
-    id: String(raw.id),
+    id: String(raw.id || raw.user_id),
     name,
-    avatar: avatarResolver?.(raw.profile_picture) || raw.profile_picture,
+    avatar: avatarResolver?.(raw.profile_picture || raw.avatar_url || raw.avatar)
+      || raw.profile_picture
+      || raw.avatar_url
+      || raw.avatar,
     userType,
+    role: userType,
     roleLabel: roleLabel(userType),
-    headline: buildProfileHeadline({
-      headline: raw.headline,
-      bio: raw.bio,
-      department: raw.department,
-      userType,
-    }),
+    academic_identity,
+    professional_identity,
+    headline:
+      academic_identity
+      || buildProfileHeadline({
+        headline: raw.headline,
+        bio: raw.bio,
+        department: raw.department,
+        course: raw.branch || raw.course,
+        company: raw.company,
+        position: raw.position,
+        userType,
+      }),
+    company: raw.company?.trim() || null,
+    position: raw.position?.trim() || null,
+    college: institution,
     institution,
     location: formatProfileLocation(raw.location),
     mutualConnections: raw.mutual_connections ?? 0,

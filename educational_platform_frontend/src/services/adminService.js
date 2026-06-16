@@ -74,6 +74,26 @@ class AdminService {
             throw new Error(response.data.message || 'Update failed');
         }
     }
+    async reviewRegistration(userId, payload) {
+        const response = await api.put(`/admin/users/${userId}/status`, payload);
+        if (response.data?.status === false) throw new Error(response.data.message || 'Review failed');
+        return response.data.data;
+    }
+    async getRegistrationApplication(userId) {
+        const response = await api.get(`/admin/registrations/${userId}`);
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Failed to load application');
+    }
+    async getAlumni(params) {
+        const response = await api.get('/admin/alumni', { params });
+        if (response.data.status && response.data.data) {
+            return {
+                alumni: response.data.data.alumni || [],
+                total: response.data.data.pagination?.total || 0,
+            };
+        }
+        return response.data;
+    }
     async createUser(payload) {
         const response = await api.post('/admin/users', payload);
         if (response.data.status && response.data.data) {
@@ -128,6 +148,59 @@ class AdminService {
         if (response.data && response.data.status === false) {
             throw new Error(response.data.message || 'Archive failed');
         }
+    }
+
+    // ── College profile management (tenant-scoped) ──────────────────────
+    async getMyCollege() {
+        const response = await api.get('/admin/my-college');
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Failed to load college profile');
+    }
+
+    /**
+     * Update the college profile. Pass `logoFile` to replace the logo in
+     * the same multipart request; omit it for a plain JSON update.
+     */
+    async updateMyCollege(payload, logoFile) {
+        let response;
+        if (logoFile) {
+            const fd = new FormData();
+            const flatten = (obj, prefix = '') => {
+                Object.entries(obj || {}).forEach(([k, v]) => {
+                    if (v === undefined || v === null) return;
+                    if (typeof v === 'object' && !Array.isArray(v)) {
+                        flatten(v, prefix ? `${prefix}[${k}]` : `${k}`);
+                    } else {
+                        fd.append(prefix ? `${prefix}[${k}]` : k, String(v));
+                    }
+                });
+            };
+            flatten(payload);
+            fd.append('logo', logoFile);
+            response = await api.put('/admin/my-college', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        } else {
+            response = await api.put('/admin/my-college', payload);
+        }
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Failed to update college profile');
+    }
+
+    async uploadMyCollegeLogo(file) {
+        const fd = new FormData();
+        fd.append('logo', file);
+        const response = await api.post('/admin/my-college/logo', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Failed to upload logo');
+    }
+
+    async removeMyCollegeLogo() {
+        const response = await api.delete('/admin/my-college/logo');
+        if (response.data?.status && response.data.data) return response.data.data;
+        throw new Error(response.data?.message || 'Failed to remove logo');
     }
 }
 export default new AdminService();

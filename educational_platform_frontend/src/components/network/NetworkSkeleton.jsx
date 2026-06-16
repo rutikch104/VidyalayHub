@@ -1,23 +1,34 @@
 export default function NetworkSkeleton({ count = 6 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="net-people-grid">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="animate-pulse rounded-[1.25rem] border border-border/40 bg-card/95 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.02)] sm:p-5"
+          className="home-profile-card home-profile-card--network home-profile-card--lovable home-profile-card--streamlined animate-pulse overflow-hidden"
+          aria-hidden
         >
-          <div className="flex gap-3">
-            <div className="h-14 w-14 rounded-full bg-muted" />
-            <div className="flex-1 space-y-2 pt-1">
-              <div className="h-4 w-2/3 rounded bg-muted" />
-              <div className="h-3 w-1/2 rounded bg-muted" />
-            </div>
+          <div className="home-profile-card__cover home-profile-card__cover--student opacity-60">
+            <div className="home-profile-card__cover-pattern opacity-40" />
           </div>
-          <div className="mt-4 h-3 w-full rounded bg-muted" />
-          <div className="mt-2 h-3 w-4/5 rounded bg-muted" />
-          <div className="mt-5 flex gap-2">
-            <div className="h-8 flex-1 rounded-full bg-muted" />
-            <div className="h-8 w-16 rounded-full bg-muted" />
+          <div className="home-profile-card__body">
+            <div className="home-profile-card__avatar-wrap">
+              <div className="home-profile-card__avatar-ring">
+                <div className="home-profile-card__avatar-link rounded-full bg-muted" />
+              </div>
+            </div>
+            <div className="home-profile-card__identity">
+              <div className="home-profile-card__identity-zone">
+                <div className="mx-auto mb-3 h-5 w-2/3 rounded bg-muted" />
+                <div className="mx-auto mb-2 h-4 w-4/5 rounded bg-muted" />
+                <div className="mx-auto h-3.5 w-3/5 rounded bg-muted" />
+              </div>
+              <div className="home-profile-card__actions-zone">
+                <div className="flex gap-3">
+                  <div className="h-11 flex-[1.6] rounded-full bg-muted" />
+                  <div className="h-11 flex-1 rounded-full border border-border/40 bg-muted/30" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ))}

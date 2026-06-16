@@ -19,12 +19,17 @@ function createCategoryFileFilter(category) {
   };
 }
 
-function createMulterStorage(category) {
+function createMulterStorage(category, options = {}) {
   return multer.diskStorage({
     destination(req, file, cb) {
       try {
-        const ownerId = req.user?.id || req.userId || 'anonymous';
-        const tenantId = req.user?.tenant_id || req.tenant?.id || null;
+        const ownerId =
+          options.ownerIdFromRequest?.(req) ||
+          req.registrationOwnerId ||
+          req.user?.id ||
+          req.userId ||
+          'anonymous';
+        const tenantId = req.user?.tenant_id || req.tenant?.id || req.body?.tenant_id || null;
         assignStorageKey(file, category, ownerId, tenantId);
         const dir = path.dirname(absolutePathForKey(file.storageKey));
         ensureDirSync(dir, fs);
@@ -114,7 +119,29 @@ const upload = {
   library: createUpload('library', { field: 'file', maxCount: 1 }),
   resume: createUpload('resume', { field: 'resume', maxCount: 1 }),
   attachment: createUpload('attachment', { field: 'attachments', maxCount: 5 }),
+  tenantLogo: createUpload('tenantLogo', { field: 'logo', maxCount: 1 }),
 };
+
+function registrationOwnerId(req) {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  if (email) return email.replace(/[^a-z0-9@._-]/gi, '_').slice(0, 64);
+  return `registration-${Date.now()}`;
+}
+
+const registrationFields = multer({
+  storage: createMulterStorage('verification', { ownerIdFromRequest: registrationOwnerId }),
+  fileFilter: createCategoryFileFilter('verification'),
+  limits: {
+    fileSize: CATEGORIES.verification.maxFileSize,
+    files: 5,
+  },
+}).fields([
+  { name: 'profile_photo', maxCount: 1 },
+  { name: 'id_card', maxCount: 1 },
+  { name: 'admission_letter', maxCount: 1 },
+  { name: 'graduation_certificate', maxCount: 1 },
+  { name: 'employment_proof', maxCount: 1 },
+]);
 
 const safeUpload = {
   post: withUpload(upload.post),
@@ -124,7 +151,27 @@ const safeUpload = {
   library: withUpload(upload.library),
   resume: withUpload(upload.resume),
   attachment: withUpload(upload.attachment),
+  tenantLogo: withUpload(upload.tenantLogo),
+  registration: withUpload(registrationFields),
 };
+
+/**
+ * Only run multer when the incoming request is multipart. Lets a single
+ * route accept either JSON (no file) or multipart (with file) without
+ * forcing every caller through FormData.
+ */
+function multipartOnly(uploadMiddleware) {
+  return (req, res, next) => {
+    const ct = String(req.headers['content-type'] || '').toLowerCase();
+    if (ct.includes('multipart/form-data')) {
+      return uploadMiddleware(req, res, next);
+    }
+    return next();
+  };
+}
+
+safeUpload.tenantLogoOptional = multipartOnly(safeUpload.tenantLogo);
+safeUpload.registrationOptional = multipartOnly(safeUpload.registration);
 
 module.exports = {
   upload: safeUpload,

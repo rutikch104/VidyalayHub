@@ -12,16 +12,11 @@ import PageHeader from '@/components/ui/PageHeader';
 import ModuleFeedTabs from '@/components/ui/ModuleFeedTabs';
 import EmptyState from '@/components/ui/EmptyState';
 import { EVENT_TABS, EVENT_CATEGORIES, isOrganizer } from './eventUtils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { toast } from '@/components/ui/sonner';
+import { NOTIF_NAV_KEYS, consumeStringKey } from '@/lib/notificationNavigation';
+import ConfirmActionDialog from '@/components/ui/ConfirmActionDialog';
+import PlatformSelect from '@/components/ui/PlatformSelect';
+import { CONFIRM_ACTION_PRESETS } from '@/components/ui/confirmActionPresets';
 
 export default function EventsPage() {
   const { user } = useAuth();
@@ -56,6 +51,19 @@ export default function EventsPage() {
     sessionStorage.removeItem('events_search_prefill');
     setSearchTerm(p);
     setDebouncedSearch(p.trim());
+  }, []);
+
+  useEffect(() => {
+    const eventId = consumeStringKey(NOTIF_NAV_KEYS.EVENT_ID);
+    if (!eventId) return;
+    void (async () => {
+      try {
+        const data = await eventsService.getEventById(eventId);
+        setDetailEvent(data.event || data);
+      } catch {
+        toast.error('Content no longer available.');
+      }
+    })();
   }, []);
 
   const loadStatuses = useCallback(async () => {
@@ -295,7 +303,7 @@ export default function EventsPage() {
             </div>
           </div>
           <div className="events-toolbar-filters">
-            <select
+            <PlatformSelect
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="events-toolbar-filters__select"
@@ -307,7 +315,7 @@ export default function EventsPage() {
                   {c}
                 </option>
               ))}
-            </select>
+            </PlatformSelect>
             <label className="events-toolbar-filters__online">
               <input
                 type="checkbox"
@@ -404,32 +412,18 @@ export default function EventsPage() {
           onGoing={handleGoing}
         />
 
-        <AlertDialog
-          open={!!deleteTarget}
-          onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete event?</AlertDialogTitle>
-              <AlertDialogDescription>
-                <strong className="text-foreground">{deleteTarget?.title}</strong>
-                {' '}will be permanently removed. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={deleting}
-                onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
-                className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                <Trash2 className="h-4 w-4" />
-                Delete event
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmActionDialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={(open) => {
+            if (!open && !deleting) setDeleteTarget(null);
+          }}
+          {...CONFIRM_ACTION_PRESETS.deleteEvent}
+          loading={deleting}
+          loadingLabel="Deleting…"
+          contextPreview={deleteTarget?.title}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+        />
       </div>
     </div>
   );

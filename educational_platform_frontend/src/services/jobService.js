@@ -19,6 +19,9 @@ class JobService {
             if (data.education_level) formData.append('education_level', data.education_level);
             if (data.salary_range) formData.append('salary_range', JSON.stringify(data.salary_range));
             if (data.application_deadline) formData.append('application_deadline', data.application_deadline);
+            if (data.skills_required?.length) {
+                formData.append('skills_required', JSON.stringify(data.skills_required));
+            }
             formData.append('company_logo', data.company_logo);
             const response = await api.post('/jobs', formData);
             if (response.data.status && response.data.data) return response.data.data;

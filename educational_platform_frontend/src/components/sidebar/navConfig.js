@@ -8,7 +8,6 @@ import {
   Bookmark,
   Briefcase,
   Calendar,
-  Settings,
   Network,
   Mic,
   Bot,
@@ -106,10 +105,6 @@ export function buildSidebarNavGroups({
       : []),
   ];
 }
-
-export const SIDEBAR_FOOTER_ITEMS = [
-  { icon: Settings, label: 'Settings', page: 'settings', description: 'Account & preferences' },
-];
 
 export const SIDEBAR_BRAND = {
   name: PLATFORM_BRAND.name,

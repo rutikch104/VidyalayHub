@@ -20,6 +20,9 @@ export default function SkillAutocomplete({
   disabled = false,
   placeholder = 'Type to search skills…',
   existingSkillNames = [],
+  maxSkills = PROFILE_SKILLS_MAX,
+  hintText,
+  scope = 'profile',
   className,
   inputClassName,
 }) {
@@ -72,7 +75,7 @@ export default function SkillAutocomplete({
     const reqId = ++requestRef.current;
     setLoading(true);
     try {
-      const data = await skillsApi.suggest(q, { limit: 8 });
+      const data = await skillsApi.suggest(q, { limit: 8, scope });
       if (reqId !== requestRef.current) return;
       setItems(data.items || []);
       setCanCreate(!!data.canCreate);
@@ -85,7 +88,7 @@ export default function SkillAutocomplete({
     } finally {
       if (reqId === requestRef.current) setLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -223,7 +226,7 @@ export default function SkillAutocomplete({
       ) : null}
 
       <p className="skill-autocomplete__hint">
-        Up to {PROFILE_SKILLS_MAX} skills · suggestions from the shared skills catalog
+        {hintText || `Up to ${maxSkills} skills · suggestions from the shared skills catalog`}
       </p>
     </div>
   );

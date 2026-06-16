@@ -1,25 +1,17 @@
 // @ts-nocheck
 export function CommunityCardSkeleton() {
   return (
-    <div className="comm-card h-full overflow-hidden">
-      <div className="comm-card__cover h-[5.5rem] animate-pulse bg-muted/80" />
-      <div className="comm-card__body flex flex-1 flex-col px-5 pb-5">
-        <div className="comm-card__avatar-row -mt-7 mb-3">
-          <div className="h-[3.75rem] w-[3.75rem] animate-pulse rounded-xl bg-muted ring-[3px] ring-card" />
-        </div>
-        <div className="flex-1 space-y-3">
-          <div className="h-5 w-2/3 animate-pulse rounded-md bg-muted" />
-          <div className="min-h-[2.5rem] space-y-2">
-            <div className="h-3.5 w-full animate-pulse rounded bg-muted/70" />
-            <div className="h-3.5 w-4/5 animate-pulse rounded bg-muted/60" />
-          </div>
-          <div className="flex gap-2">
-            <div className="h-3 w-24 animate-pulse rounded bg-muted/60" />
-            <div className="h-3 w-16 animate-pulse rounded bg-muted/60" />
-          </div>
-        </div>
-        <div className="comm-card__footer pt-5">
-          <div className="h-10 w-full animate-pulse rounded-[0.625rem] bg-muted/80" />
+    <div className="comm-card-skeleton--lovable h-full" aria-hidden>
+      <div className="comm-card-skeleton__hero" />
+      <div className="comm-card-skeleton__body">
+        <div className="comm-card-skeleton__logo" />
+        <div className="comm-card-skeleton__line comm-card-skeleton__line--sm" />
+        <div className="comm-card-skeleton__line comm-card-skeleton__line--title" />
+        <div className="comm-card-skeleton__line comm-card-skeleton__line--desc" />
+        <div className="comm-card-skeleton__stats comm-card-skeleton__pill" />
+        <div className="comm-card-skeleton__actions">
+          <div className="comm-card-skeleton__btn" />
+          <div className="comm-card-skeleton__btn comm-card-skeleton__btn--view" />
         </div>
       </div>
     </div>

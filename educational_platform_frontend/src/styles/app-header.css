@@ -159,6 +159,22 @@
   box-shadow: 0 1px 3px color-mix(in oklab, black 18%, transparent);
 }
 
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 75%, transparent);
+  background: color-mix(in oklab, var(--sidebar-accent) 40%, var(--sidebar));
+  padding: 0.1875rem;
+}
+
+.app-header__actions .app-header__icon-btn {
+  height: 2rem;
+  width: 2rem;
+  border-radius: 0.5rem;
+}
+
 /* Premium search */
 .app-header__search {
   position: relative;
@@ -167,37 +183,46 @@
 
 .app-header__search-input {
   width: 100%;
-  height: 2.5rem;
+  height: 2.625rem;
   border-radius: 9999px;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 85%, transparent);
-  background: color-mix(in oklab, var(--sidebar-accent) 55%, var(--sidebar));
-  padding-left: 2.5rem;
-  padding-right: 3.25rem;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 55%, #e2e8f0);
+  background: #ffffff;
+  padding-left: 2.625rem;
+  padding-right: 3.375rem;
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: -0.01em;
   line-height: 1.25;
-  color: var(--sidebar-foreground);
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  color: color-mix(in oklab, var(--sidebar-foreground) 92%, #0f172a);
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--foreground) 4%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 80%, transparent);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .app-header__search-input::placeholder {
-  color: color-mix(in oklab, var(--sidebar-foreground) 42%, transparent);
+  color: color-mix(in oklab, var(--sidebar-foreground) 38%, #94a3b8);
   font-weight: 400;
 }
 
 .app-header__search-input:hover {
-  border-color: color-mix(in oklab, var(--vh-primary) 28%, var(--sidebar-border));
-  background: color-mix(in oklab, var(--sidebar-accent) 75%, var(--sidebar));
+  border-color: color-mix(in oklab, var(--vh-primary) 32%, #cbd5e1);
+  background: #ffffff;
+  box-shadow:
+    0 2px 6px -2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 80%, transparent);
 }
 
 .app-header__search-input:focus {
   outline: none;
-  border-color: color-mix(in oklab, var(--vh-primary) 45%, transparent);
-  background: var(--sidebar);
+  border-color: color-mix(in oklab, var(--vh-primary) 55%, transparent);
+  background: #ffffff;
   box-shadow:
-    0 0 0 3px color-mix(in oklab, var(--vh-primary) 12%, transparent),
-    0 2px 8px -4px color-mix(in oklab, var(--vh-primary) 15%, transparent);
+    0 0 0 3px color-mix(in oklab, var(--vh-primary) 14%, transparent),
+    0 4px 12px -4px color-mix(in oklab, var(--vh-primary) 18%, transparent);
 }
 
 .app-header__search-input--has-value {
@@ -214,13 +239,13 @@
 .app-header__search-icon {
   pointer-events: none;
   position: absolute;
-  left: 0.875rem;
+  left: 0.9375rem;
   top: 50%;
   z-index: 1;
-  height: 1rem;
-  width: 1rem;
+  height: 1.0625rem;
+  width: 1.0625rem;
   transform: translateY(-50%);
-  color: color-mix(in oklab, var(--sidebar-foreground) 42%, transparent);
+  color: color-mix(in oklab, var(--sidebar-foreground) 40%, #94a3b8);
   transition: color 0.2s ease;
 }
 
@@ -242,14 +267,14 @@
 .app-header__search-kbd {
   display: none;
   border-radius: 0.375rem;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 90%, transparent);
-  background: color-mix(in oklab, var(--sidebar) 85%, white);
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 70%, #e2e8f0);
+  background: color-mix(in oklab, #f8fafc 85%, var(--sidebar));
   padding: 0.125rem 0.4375rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: color-mix(in oklab, var(--sidebar-foreground) 48%, transparent);
+  color: color-mix(in oklab, var(--sidebar-foreground) 45%, #64748b);
 }
 
 @media (min-width: 640px) {
@@ -266,8 +291,8 @@
   justify-content: center;
   border-radius: 9999px;
   border: none;
-  background: color-mix(in oklab, var(--sidebar-foreground) 8%, var(--sidebar-accent));
-  color: color-mix(in oklab, var(--sidebar-foreground) 58%, transparent);
+  background: color-mix(in oklab, var(--sidebar-foreground) 6%, #f1f5f9);
+  color: color-mix(in oklab, var(--sidebar-foreground) 55%, #64748b);
   transition: all 0.15s ease;
 }
 
@@ -285,11 +310,12 @@
   min-width: 20rem;
   overflow: hidden;
   border-radius: 0.875rem;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 88%, transparent);
-  background: var(--sidebar);
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 55%, #e2e8f0);
+  background: #ffffff;
   box-shadow:
-    0 20px 48px -16px color-mix(in oklab, var(--foreground) 16%, transparent),
-    0 0 0 1px color-mix(in oklab, var(--sidebar-border) 45%, transparent);
+    0 20px 48px -16px color-mix(in oklab, var(--foreground) 18%, transparent),
+    0 8px 16px -8px color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 0 0 1px color-mix(in oklab, #f1f5f9 80%, transparent);
 }
 
 .app-header__search-panel-head {
@@ -297,9 +323,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--sidebar-border) 72%, transparent);
-  background: color-mix(in oklab, var(--sidebar-accent) 42%, var(--sidebar));
-  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--sidebar-border) 45%, #f1f5f9);
+  background: color-mix(in oklab, #f8fafc 92%, white);
+  padding: 0.5625rem 0.875rem;
 }
 
 .app-header__search-panel-status {
@@ -319,13 +345,13 @@
 .app-header__search-panel-hint {
   flex-shrink: 0;
   border-radius: 0.375rem;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 85%, transparent);
-  background: color-mix(in oklab, var(--sidebar) 80%, white);
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 55%, #e2e8f0);
+  background: #ffffff;
   padding: 0.125rem 0.4375rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.625rem;
   font-weight: 600;
-  color: color-mix(in oklab, var(--sidebar-foreground) 45%, transparent);
+  color: color-mix(in oklab, var(--sidebar-foreground) 42%, #64748b);
 }
 
 .app-header__search-panel-body {
@@ -486,7 +512,7 @@
 .global-search-panel__row--focused,
 .global-search-panel__row--person:hover,
 .global-search-panel__row--stacked:hover {
-  background: color-mix(in oklab, var(--vh-primary) 7%, var(--sidebar-accent));
+  background: color-mix(in oklab, var(--vh-primary) 6%, #f8fafc);
 }
 
 .global-search-panel__row-main {
@@ -564,8 +590,155 @@
 }
 
 .global-search-panel__row-action:hover {
-  background: color-mix(in oklab, var(--vh-primary) 12%, var(--sidebar));
+  background: color-mix(in oklab, var(--vh-primary) 10%, #ffffff);
   border-color: color-mix(in oklab, var(--vh-primary) 35%, transparent);
+}
+
+/* Idle / suggestions panel */
+.global-search-panel--idle {
+  padding: 0.25rem 0 0.375rem;
+}
+
+.global-search-panel--empty-results {
+  padding-bottom: 0.5rem;
+}
+
+.global-search-panel__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-right: 0.875rem;
+}
+
+.global-search-panel__clear-all {
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vh-primary);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: background 0.15s ease;
+}
+
+.global-search-panel__clear-all:hover {
+  background: color-mix(in oklab, var(--vh-primary) 8%, #f8fafc);
+}
+
+.global-search-panel__recent-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.625rem;
+  padding: 0.125rem 0.375rem 0.125rem 0.25rem;
+  transition: background 0.15s ease;
+}
+
+.global-search-panel__recent-item:hover {
+  background: color-mix(in oklab, var(--vh-primary) 5%, #f8fafc);
+}
+
+.global-search-panel__suggestion-row {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.625rem;
+  border: none;
+  background: transparent;
+  padding: 0.4375rem 0.375rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.global-search-panel__suggestion-icon {
+  height: 0.875rem;
+  width: 0.875rem;
+  flex-shrink: 0;
+  color: color-mix(in oklab, var(--sidebar-foreground) 38%, #94a3b8);
+}
+
+.global-search-panel__suggestion-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--sidebar-foreground) 88%, #0f172a);
+}
+
+.global-search-panel__remove-recent {
+  display: flex;
+  height: 1.625rem;
+  width: 1.625rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: color-mix(in oklab, var(--sidebar-foreground) 35%, #94a3b8);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.global-search-panel__recent-item:hover .global-search-panel__remove-recent,
+.global-search-panel__remove-recent:focus-visible {
+  opacity: 1;
+}
+
+.global-search-panel__remove-recent:hover {
+  background: color-mix(in oklab, var(--sidebar-foreground) 6%, #f1f5f9);
+  color: color-mix(in oklab, var(--sidebar-foreground) 65%, #475569);
+}
+
+.global-search-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4375rem;
+  padding: 0 0.875rem 0.625rem;
+}
+
+.global-search-panel__chips--centered {
+  justify-content: center;
+  padding-top: 0.25rem;
+}
+
+.global-search-panel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 50%, #e2e8f0);
+  background: color-mix(in oklab, #f8fafc 90%, white);
+  padding: 0.375rem 0.6875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--sidebar-foreground) 78%, #334155);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.global-search-panel__chip:hover {
+  border-color: color-mix(in oklab, var(--vh-primary) 28%, #e2e8f0);
+  background: color-mix(in oklab, var(--vh-primary) 6%, #ffffff);
+  color: var(--vh-primary);
+  box-shadow: 0 2px 6px -3px color-mix(in oklab, var(--vh-primary) 20%, transparent);
+}
+
+.global-search-panel__chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--vh-primary) 18%, transparent);
 }
 
 /* Mobile search overlay panel */
@@ -578,8 +751,8 @@
   shrink: 0;
   align-items: center;
   gap: 0.625rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--sidebar-border) 72%, transparent);
-  background: color-mix(in oklab, var(--sidebar-accent) 35%, var(--sidebar));
+  border-bottom: 1px solid color-mix(in oklab, var(--sidebar-border) 45%, #f1f5f9);
+  background: #ffffff;
   padding: 0.75rem 0.875rem;
 }
 
@@ -590,7 +763,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: var(--sidebar-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 92%, #0f172a);
 }
 
 .app-header__mobile-search-input-row input::placeholder {
@@ -632,49 +805,20 @@
     transform: translateX(-50%);
   }
 }
-.app-header__nav {
-  display: none;
-  align-items: center;
-  gap: 0.125rem;
-  border-radius: 0.75rem;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 75%, transparent);
-  background: color-mix(in oklab, var(--sidebar-accent) 40%, var(--sidebar));
-  padding: 0.1875rem;
-}
-
-@media (min-width: 1024px) {
-  .app-header__nav {
-    display: flex;
-  }
-}
-
-.app-header__nav-item {
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: color-mix(in oklab, var(--sidebar-foreground) 55%, transparent);
-  transition: all 0.2s ease;
-}
-
-.app-header__nav-item:hover {
-  background: color-mix(in oklab, var(--sidebar) 90%, white);
-  color: var(--sidebar-foreground);
-}
-
-.app-header__nav-item--active {
-  background: var(--sidebar);
-  color: var(--vh-primary);
-  box-shadow:
-    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
-    0 0 0 1px color-mix(in oklab, var(--sidebar-border) 60%, transparent);
-}
-
 /* User chip */
 .app-header__user {
   position: relative;
   margin-left: 0.125rem;
+}
+
+.app-header__user-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  padding: 0.1875rem;
+  padding-right: 0.625rem;
 }
 
 .app-header__user-trigger {
@@ -904,9 +1048,9 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 1rem;
-  border: 1px solid color-mix(in oklab, var(--sidebar-border) 85%, transparent);
-  background: var(--sidebar);
-  box-shadow: 0 24px 48px -16px color-mix(in oklab, var(--foreground) 20%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 55%, #e2e8f0);
+  background: #ffffff;
+  box-shadow: 0 24px 48px -16px color-mix(in oklab, var(--foreground) 22%, transparent);
 }
 
 .app-header__super-badge {
@@ -925,4 +1069,154 @@
   .app-header__super-badge {
     display: inline-flex;
   }
+}
+
+/* ── Header profile menu ── */
+.header-profile-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.125rem;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  padding: 0.0625rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.header-profile-menu__trigger:hover {
+  border-color: color-mix(in oklab, var(--vh-primary) 22%, transparent);
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--vh-primary) 12%, transparent);
+}
+
+.header-profile-menu__trigger:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklab, var(--vh-primary) 35%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--vh-primary) 14%, transparent);
+}
+
+.header-profile-menu__trigger[data-state='open'] {
+  border-color: color-mix(in oklab, var(--vh-primary) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--vh-primary) 12%, transparent);
+}
+
+.header-profile-menu__avatar {
+  height: 2.125rem;
+  width: 2.125rem;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 80%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+@media (min-width: 640px) {
+  .header-profile-menu__avatar {
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+}
+
+.header-profile-menu__avatar-fallback {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--vh-primary) 88%, white) 0%,
+    color-mix(in oklab, var(--primary-glow, var(--vh-primary)) 75%, white) 100%
+  );
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: white;
+}
+
+.header-profile-menu__content {
+  overflow: hidden;
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 85%, transparent);
+  background: color-mix(in oklab, var(--sidebar) 96%, white);
+  box-shadow:
+    0 4px 6px -2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 16px 32px -12px color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+
+.header-profile-menu__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--sidebar-border) 70%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--sidebar-accent) 55%, transparent) 0%,
+    transparent 100%
+  );
+  padding: 0.875rem 0.875rem 0.8125rem;
+}
+
+.header-profile-menu__head-avatar {
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 75%, transparent);
+}
+
+.header-profile-menu__name {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--sidebar-foreground);
+}
+
+.header-profile-menu__role {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in oklab, var(--sidebar-foreground) 58%, transparent);
+}
+
+.header-profile-menu__items {
+  padding: 0.375rem;
+}
+
+.header-profile-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.625rem;
+  padding: 0.5625rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--sidebar-foreground) 88%, transparent);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.header-profile-menu__item:hover,
+.header-profile-menu__item:focus {
+  background: color-mix(in oklab, var(--sidebar-accent) 85%, transparent);
+  color: var(--sidebar-foreground);
+}
+
+.header-profile-menu__item--active {
+  background: color-mix(in oklab, var(--vh-primary) 10%, var(--sidebar));
+  color: var(--vh-primary);
+}
+
+.header-profile-menu__item--danger {
+  color: oklch(0.52 0.2 25);
+}
+
+.header-profile-menu__item--danger:hover,
+.header-profile-menu__item--danger:focus {
+  background: oklch(0.97 0.03 25);
+  color: oklch(0.48 0.22 25);
+}
+
+.header-profile-menu__separator {
+  margin: 0.3125rem 0;
+  background: color-mix(in oklab, var(--sidebar-border) 75%, transparent);
 }

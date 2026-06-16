@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             primaryKey: true,
             references: {
-                model: 'Users', // Name of the referenced table
+                model: 'Users',
                 key: 'id',
             },
         },
@@ -27,6 +27,54 @@ module.exports = (sequelize, DataTypes) => {
         },
         passout_date: {
             type: DataTypes.DATE,
+            allowNull: true,
+        },
+        roll_number: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        student_id: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        university_reg_number: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        division: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        admission_year: {
+            type: DataTypes.SMALLINT,
+            allowNull: true,
+        },
+        expected_graduation_year: {
+            type: DataTypes.SMALLINT,
+            allowNull: true,
+        },
+        cgpa: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        percentage: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        id_document_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        admission_letter_url: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        academic_batch: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+        },
+        college_id: {
+            type: DataTypes.STRING(100),
             allowNull: true,
         },
     });

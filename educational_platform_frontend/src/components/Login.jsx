@@ -79,7 +79,7 @@ export default function Login() {
 
       {/* ── Right form ───────────────────────────────────── */}
       <div className="auth-panel-form">
-        <div className="w-full max-w-md">
+        <div className="auth-panel-form__login">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-xs">
